@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evidence — AWS Agent Space</title>
+<link rel="icon" type="image/svg+xml" href="/static/icons/aws/aws-cloud.svg">
+<link rel="stylesheet" href="/static/css/evidence.css">
+<style>
+/* ── Reset + Base ── */
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;line-height:1.5;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+a{color:#38bdf8;text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── Layout ── */
+#header{padding:12px 20px;background:#0f172a;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#header h1{font-size:1rem;font-weight:600;color:#f8fafc}
+#header .badge{font-size:0.65rem;padding:2px 8px;border-radius:10px;background:#1e293b;color:#94a3b8}
+#header .stats{margin-left:auto;display:flex;gap:6px}
+
+#layout{display:flex;gap:0;flex:1;overflow:hidden}
+#findingsPanel{width:380px;min-width:320px;overflow-y:auto;border-right:1px solid #1e293b;padding:12px;background:#0f172a}
+#evidencePanel{flex:1;overflow-y:auto;padding:12px;background:#020617}
+
+/* ── Tabs ── */
+.ev-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.ev-tab{padding:4px 10px;font-size:0.7rem;border-radius:12px;cursor:pointer;background:#1e293b;border:1px solid #334155;color:#94a3b8;transition:all .15s;user-select:none}
+.ev-tab.active{background:#0f766e;border-color:#14b8a6;color:#f0fdfa}
+.ev-tab:hover:not(.active){border-color:#475569}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#020617}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#475569}
+
+/* ── Page-specific ── */
+#rcaReport{flex-shrink:0;background:#0f172a;border-bottom:1px solid #1e293b}
+</style>
+</head>
+<body>
+
+<div id="header">
+    <h1>Evidence Dashboard</h1>
+    <span class="badge" id="taskBadge">{{ task_id or 'No task' }}</span>
+    <div class="stats" id="headerStats"></div>
+</div>
+
+<div id="rcaReport" style="display:none">
+    <div class="rca-toggle-bar" onclick="toggleRcaReport()">
+        <div class="rca-toggle-title">
+            <span id="rcaChevron">&#9660;</span>
+            <span class="rca-label">RCA 보고서</span>
+            <span class="rca-summary-badge" id="rcaSummaryBadge"></span>
+        </div>
+    </div>
+    <div class="rca-body" id="rcaBody">
+        <div id="rcaSymptom"></div>
+        <div class="rca-columns">
+            <div class="rca-chain-col">
+                <div class="rca-section-label">인과관계 체인</div>
+                <div class="rca-chain" id="rcaChain"></div>
+            </div>
+            <div class="rca-metrics-col">
+                <div class="rca-section-label" style="display:flex;justify-content:space-between;align-items:center">
+                    <span>핵심 증거</span>
+                    <span id="cwDashboardAction"></span>
+                </div>
+                <div id="rcaEvidence"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="layout">
+    <div id="findingsPanel">
+        <div class="fp-label">Findings &amp; Evidence Chain</div>
+        <div id="findingsContent"><div class="ev-empty">Loading...</div></div>
+    </div>
+    <div id="evidencePanel">
+        <div class="ev-tabs" id="evidenceTabs"></div>
+        <div id="evidenceCards"><div class="ev-empty">Loading...</div></div>
+    </div>
+</div>
+
+<div class="ev-toast" id="toast"></div>
+
+<script src="/static/js/evidence-renderer.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════
+// Config + State
+// ══════════════════════════════════════════════════════════
+
+const TASK_ID = '{{ task_id }}';
+const REGION = 'us-east-1';
+let evidenceData = null;
+let activeTab = null;
+
+// ══════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════
+
+async function init() {
+    // embed 모드: iframe 임베딩 시 헤더 숨기고 스크롤 허용
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('embed') === '1') {
+        document.getElementById('header').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    if (!TASK_ID) {
+        document.getElementById('findingsContent').innerHTML = '<div class="ev-empty">task_id 파라미터가 필요합니다.<br><code>/evidence?task_id=...</code></div>';
+        document.getElementById('evidenceCards').innerHTML = '';
+        return;
+    }
+    try {
+        const resp = await fetch(`/api/evidence?task_id=${encodeURIComponent(TASK_ID)}`);
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error || 'API error');
+        evidenceData = json.evidence;
+        renderAll();
+    } catch (e) {
+        document.getElementById('findingsContent').innerHTML = `<div class="ev-empty">데이터 로딩 실패: ${e.message}</div>`;
+        document.getElementById('evidenceCards').innerHTML = '';
+    }
+}
+
+function renderAll() {
+    renderHeaderStats();
+    renderRcaReport();
+    renderFindingsPanel();
+    renderEvidenceDashboard();
+}
+
+// ══════════════════════════════════════════════════════════
+// Header Stats
+// ══════════════════════════════════════════════════════════
+
+function renderHeaderStats() {
+    const el = document.getElementById('headerStats');
+    const s = evidenceData.stats;
+    el.innerHTML = TAB_ORDER
+        .filter(t => s[t])
+        .map(t => `<span class="badge">${TYPE_ICONS[t]} ${s[t]}</span>`)
+        .join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// RCA Report (top section)
+// ══════════════════════════════════════════════════════════
+
+function renderRcaReport() {
+    const {findings, symptom, summary, signals} = evidenceData;
+    const reportEl = document.getElementById('rcaReport');
+
+    if (!findings.length && !symptom) {
+        reportEl.style.display = 'none';
+        return;
+    }
+    reportEl.style.display = '';
+
+    // Symptom banner
+    const symEl = document.getElementById('rcaSymptom');
+    if (symptom) {
+        const time = symptom.start_time ? symptom.start_time.replace('T',' ').replace('Z','') : '';
+        symEl.innerHTML = `<div class="rca-symptom-banner">
+            <span class="rca-sym-title">🚨 ${esc(symptom.title)}</span>
+            <span class="rca-sym-desc">${esc(symptom.description).substring(0,200)}</span>
+            ${time ? `<span class="rca-sym-time">${time}</span>` : ''}
+        </div>`;
+    } else {
+        symEl.innerHTML = '';
+    }
+
+    // Cascade chain (shared functions from evidence-renderer.js)
+    const chain = buildCascadeChain(findings, summary);
+    renderCascadeChain(chain, symptom);
+
+    // Finding-driven evidence
+    renderFindingEvidence(chain, evidenceData);
+
+    // CloudWatch dashboard button
+    renderCwDashboardButton();
+}
+
+function toggleRcaReport() {
+    const body = document.getElementById('rcaBody');
+    const chevron = document.getElementById('rcaChevron');
+    const badge = document.getElementById('rcaSummaryBadge');
+    const isOpen = !body.classList.contains('collapsed');
+
+    if (isOpen) {
+        body.classList.add('collapsed');
+        chevron.innerHTML = '&#9654;';
+        // Show root cause summary badge
+        if (evidenceData) {
+            const rc = evidenceData.findings.find(f => f.finding_type === 'root_cause');
+            if (rc) {
+                badge.textContent = rc.title.substring(0, 60) + (rc.title.length > 60 ? '...' : '');
+                badge.style.display = 'inline';
+            }
+        }
+    } else {
+        body.classList.remove('collapsed');
+        chevron.innerHTML = '&#9660;';
+        badge.style.display = 'none';
+    }
+}
+
+function renderCwDashboardButton() {
+    const el = document.getElementById('cwDashboardAction');
+    if (!el) return;
+    el.innerHTML = `<button class="rca-cw-btn" onclick="createCwDashboard(this)">CloudWatch 대시보드 생성</button>`;
+}
+
+async function createCwDashboard(btn) {
+    btn.disabled = true;
+    btn.textContent = '생성 중...';
+    try {
+        const resp = await fetch('/api/evidence/dashboard', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({task_id: TASK_ID}),
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'Failed');
+
+        const el = document.getElementById('cwDashboardAction');
+        el.innerHTML = `<a class="rca-cw-link" href="${esc(data.dashboard_url)}" target="_blank" rel="noopener">CloudWatch 대시보드 열기 (${data.services.join(', ')})</a>`;
+        showToast(`대시보드 생성 완료: ${data.dashboard_name}`);
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'CloudWatch 대시보드 생성';
+        showToast(`실패: ${e.message}`);
+    }
+}
+
+// ══════════════════════════════════════════════════════════
+// Findings Panel (left)
+// ══════════════════════════════════════════════════════════
+
+function renderFindingsPanel() {
+    const el = document.getElementById('findingsContent');
+    const {findings, observations, symptom} = evidenceData;
+
+    if (!findings.length && !symptom) {
+        el.innerHTML = '<div class="ev-empty">추출된 Evidence가 없습니다.</div>';
+        return;
+    }
+
+    let html = '';
+
+    // Symptom
+    if (symptom) {
+        html += `<div class="fp-symptom">
+            <div class="fp-symptom-title">🚨 ${esc(symptom.title)}</div>
+            <div class="fp-symptom-desc">${esc(symptom.description)}</div>
+            ${symptom.start_time ? `<div class="fp-symptom-time">발생: ${symptom.start_time}</div>` : ''}
+        </div>`;
+    }
+
+    // Findings
+    for (const f of findings) {
+        const obsIds = f.supporting_observations || [];
+        let obsHtml = '';
+        for (const obsId of obsIds) {
+            const obs = observations[obsId];
+            if (!obs) continue;
+            const signals = obs.signals || [];
+            const sigItems = signals.map(sig => {
+                const icon = TYPE_ICONS[sig.type] || '📎';
+                return `<div class="fp-signal-item" data-signal-id="${esc(sig.id)}" onclick="highlightSignalCard('${esc(sig.id)}')">${icon} ${esc(sig.title || sig.id)}</div>`;
+            }).join('');
+            obsHtml += `<div class="fp-obs">
+                <div class="fp-obs-title" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.fp-toggle').textContent=this.nextElementSibling.classList.contains('open')?'▼':'▶'">
+                    <span class="fp-toggle">▶</span> ${esc(obs.title)} <span style="color:#475569;font-size:0.6rem">(${signals.length}건)</span>
+                </div>
+                <div class="fp-signals">${sigItems}</div>
+            </div>`;
+        }
+
+        html += `<div class="fp-finding" id="finding-${esc(f.id)}">
+            <div class="fp-finding-type">${f.finding_type || 'finding'}</div>
+            <div class="fp-finding-title">${esc(f.title)}</div>
+            <div class="fp-finding-desc">${esc(f.description || '').substring(0, 200)}${(f.description||'').length > 200 ? '...' : ''}</div>
+            ${obsHtml}
+        </div>`;
+    }
+
+    el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════
+// Evidence Dashboard (right) — Tabs + Cards
+// ══════════════════════════════════════════════════════════
+
+function renderEvidenceDashboard() {
+    const tabsEl = document.getElementById('evidenceTabs');
+    const s = evidenceData.stats;
+
+    let firstType = null;
+    tabsEl.innerHTML = TAB_ORDER
+        .filter(t => s[t])
+        .map(t => {
+            if (!firstType) firstType = t;
+            return `<div class="ev-tab${t===firstType?' active':''}" data-type="${t}" onclick="switchTab('${t}')">${TYPE_ICONS[t]} ${TYPE_LABELS[t]}(${s[t]})</div>`;
+        }).join('');
+
+    if (firstType) switchTab(firstType);
+}
+
+function switchTab(type) {
+    activeTab = type;
+    document.querySelectorAll('.ev-tab').forEach(t => t.classList.toggle('active', t.dataset.type === type));
+
+    const signals = evidenceData.signals.filter(s => s.type === type);
+    const cardsEl = document.getElementById('evidenceCards');
+
+    if (!signals.length) {
+        cardsEl.innerHTML = '<div class="ev-empty">해당 유형의 signal이 없습니다.</div>';
+        return;
+    }
+
+    cardsEl.innerHTML = signals.map(sig => renderSignalCard(sig)).join('');
+
+    // Render sparklines after DOM update
+    if (type === 'metric') {
+        requestAnimationFrame(() => {
+            signals.forEach(sig => {
+                const canvas = document.getElementById(`spark-${sig.id}`);
+                if (canvas) drawSparkline(canvas, sig);
+            });
+        });
+    }
+}
+
+// ══════════════════════════════════════════════════════════
+// Signal Card Renderer (dispatch by type)
+// ══════════════════════════════════════════════════════════
+
+function renderSignalCard(sig) {
+    const renderer = {
+        metric: renderMetricCard,
+        change_event: renderChangeEventCard,
+        trace: renderTraceCard,
+        code_snippet: renderCodeSnippetCard,
+        log: renderLogCard,
+    }[sig.type] || renderGenericCard;
+
+    const findingTags = (sig._finding_refs || []).map(f =>
+        `<span class="ev-card-tag finding" onclick="event.stopPropagation();highlightFinding('${esc(f.id)}')">${esc(f.title).substring(0,30)}</span>`
+    ).join('');
+
+    const deepLink = sig._deep_link
+        ? (sig._deep_link.startsWith('kubectl')
+            ? `<span class="ev-link-cmd" onclick="event.stopPropagation();copyCmd('${esc(sig._deep_link)}')" title="클릭하여 복사">$ ${esc(sig._deep_link)}</span>`
+            : `<a class="ev-link" href="${esc(sig._deep_link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 Open</a>`)
+        : '';
+
+    return `<div class="ev-card" id="sig-${esc(sig.id)}" onclick="togglePreview('prev-${esc(sig.id)}')">
+        <div class="ev-card-title">${TYPE_ICONS[sig.type]||'📎'} ${esc(sig.title || sig.id)}</div>
+        <div class="ev-card-meta">
+            <span class="ev-card-tag obs">${esc(sig._observation_title || '').substring(0,40)}</span>
+            ${findingTags}
+            ${deepLink}
+        </div>
+        <div class="ev-preview" id="prev-${esc(sig.id)}">
+            ${renderer(sig)}
+        </div>
+    </div>`;
+}
+
+// ── Metric ──
+
+function renderMetricCard(sig) {
+    const ds = sig.datasets?.metricDataset?.[0];
+    if (!ds) return '<div style="color:#475569">데이터 없음</div>';
+
+    const data = ds.data || [];
+    const unit = ds.unit || '';
+    const values = data.map(d => d.y);
+    const min = Math.min(...values).toFixed(1);
+    const max = Math.max(...values).toFixed(1);
+    const avg = (values.reduce((a,b)=>a+b,0)/values.length).toFixed(1);
+
+    let tableRows = data.map(d =>
+        `<tr><td class="ev-log-ts">${fmtTime(d.x)}</td><td>${d.y}${unit==='milliseconds'?'ms':''}</td></tr>`
+    ).join('');
+
+    return `<canvas class="ev-sparkline" id="spark-${esc(sig.id)}" width="600" height="80"></canvas>
+        <div style="font-size:0.63rem;color:#64748b;margin-top:4px">min: ${min} | max: ${max} | avg: ${avg} ${unit==='milliseconds'?'ms':unit}</div>
+        <details style="margin-top:6px"><summary style="font-size:0.63rem;color:#475569;cursor:pointer">데이터 테이블 (${data.length}건)</summary>
+        <table style="width:100%;font-size:0.63rem;margin-top:4px"><tbody>${tableRows}</tbody></table></details>`;
+}
+
+// ── Change Event ──
+
+function renderChangeEventCard(sig) {
+    const ce = sig.change_event;
+    if (!ce) return '';
+
+    const reason = ce.details?.reason || '';
+    const icon = REASON_ICONS[reason] || REASON_ICONS.default;
+    const isSuspicious = ce.details?.suspicious_env_var || ce.details?.new_env;
+    const ts = ce.timestamp ? ce.timestamp.split('T')[1]?.replace('Z','') || ce.timestamp : '';
+
+    let detailLines = Object.entries(ce.details || {})
+        .filter(([k]) => k !== 'reason')
+        .map(([k,v]) => `<div><span style="color:#475569">${esc(k)}:</span> ${esc(String(v))}</div>`)
+        .join('');
+
+    return `<div class="ev-event${isSuspicious?' suspicious':''}">
+        <div class="ev-event-time">${ts}</div>
+        <div class="ev-event-body">
+            <div class="ev-event-reason">${icon} ${esc(reason)} — ${esc(ce.resource||'')}</div>
+            <div class="ev-event-detail">${esc(ce.details?.message || '')}</div>
+            <div class="ev-event-detail" style="margin-top:4px">${detailLines}</div>
+            <div style="font-size:0.6rem;color:#475569;margin-top:4px">actor: ${esc(ce.actor||'')}</div>
+        </div>
+    </div>`;
+}
+
+// ── Trace ──
+
+function renderTraceCard(sig) {
+    const records = sig.traces?.records || [];
+    if (!records.length) return '<div style="color:#475569">트레이스 없음</div>';
+
+    let rows = records.map(r => {
+        const statusCls = r.status === 'error' ? 'ev-trace-err' : 'ev-trace-ok';
+        const statusIcon = r.status === 'error' ? '🔴' : '🟢';
+        const tid = r.trace_id || '';
+        const shortTid = tid.length > 24 ? tid.substring(0,24)+'...' : tid;
+        const xrayUrl = `https://${REGION}.console.aws.amazon.com/xray/home?region=${REGION}#/traces/${tid}`;
+
+        let spanHtml = (r.spans || []).map(sp => {
+            const spCls = sp.status === 'error' ? 'error' : '';
+            return `<div class="ev-span ${spCls}">${esc(sp.service)} → ${esc(sp.operation)} | ${sp.duration_ms}ms${sp.error_message ? ' | '+esc(sp.error_message) : ''}</div>`;
+        }).join('');
+
+        return `<tr><td><a class="ev-trace-id" href="${xrayUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${shortTid}</a></td>
+            <td>${r.duration_ms}ms</td><td class="${statusCls}">${statusIcon} ${r.status}</td>
+            <td class="ev-log-ts">${r.timestamp?.split('T')[1]?.substring(0,8)||''}</td></tr>
+            <tr><td colspan="4" style="padding:0">${spanHtml}</td></tr>`;
+    }).join('');
+
+    return `<table class="ev-trace-tbl"><thead><tr><th>Trace ID</th><th>Duration</th><th>Status</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ── Code Snippet ──
+
+function renderCodeSnippetCard(sig) {
+    const cs = sig.code_snippet;
+    if (!cs) return '';
+
+    const meta = cs.metadata || {};
+    const repo = meta.repository_id || '';
+    const commitRange = meta.commit_id ? `${(meta.commit_id.start_commit||'').substring(0,7)}..${(meta.commit_id.end_commit||'').substring(0,7)}` : '';
+
+    let diffsHtml = (cs.code_diffs || []).map(diff => {
+        const fp = diff.file_path?.new || diff.file_path?.old || '';
+        const startLine = diff.start_line?.new || diff.start_line?.old || 1;
+        const lines = (diff.content || '').split('\n').map(line => {
+            if (line.startsWith('+')) return `<span class="add">${esc(line)}</span>`;
+            if (line.startsWith('-')) return `<span class="del">${esc(line)}</span>`;
+            return `<span class="ctx">${esc(line)}</span>`;
+        }).join('\n');
+
+        return `<div style="font-size:0.63rem;color:#64748b;margin-bottom:2px">${esc(fp)}:${startLine}</div><div class="ev-diff">${lines}</div>`;
+    }).join('<div style="margin:6px 0"></div>');
+
+    return `${commitRange ? `<div style="font-size:0.6rem;color:#475569;margin-bottom:6px">commits: ${commitRange}</div>` : ''}
+        ${diffsHtml}`;
+}
+
+// ── Log ──
+
+function renderLogCard(sig) {
+    const msgs = sig.logs?.messages || [];
+    if (!msgs.length) return '<div style="color:#475569">로그 없음</div>';
+
+    const source = sig.logs?.source || '';
+    const lines = msgs.map(m => {
+        const ts = m.timestamp ? `<span class="ev-log-ts">${m.timestamp.split('T')[1]?.substring(0,12)||m.timestamp}</span> ` : '';
+        const msg = m.message || '';
+        const cls = msg.includes('ERROR') ? 'ev-log-err' : (msg.includes('INFO') ? 'ev-log-info' : '');
+        return `<div class="ev-log-line ${cls}">${ts}${esc(msg)}</div>`;
+    }).join('');
+
+    return `${source ? `<div style="font-size:0.6rem;color:#475569;margin-bottom:4px">source: ${source}</div>` : ''}
+        <div class="ev-log">${lines}</div>`;
+}
+
+// ── Generic fallback ──
+
+function renderGenericCard(sig) {
+    return `<pre style="font-size:0.6rem;color:#64748b;max-height:200px;overflow:auto">${esc(JSON.stringify(sig, null, 2))}</pre>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// Interactions
+// ══════════════════════════════════════════════════════════
+
+function togglePreview(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('open');
+}
+
+function highlightSignalCard(sigId) {
+    // Find the signal's type and switch tab if needed
+    const sig = evidenceData.signals.find(s => s.id === sigId);
+    if (sig && sig.type !== activeTab) switchTab(sig.type);
+
+    requestAnimationFrame(() => {
+        const card = document.getElementById(`sig-${sigId}`);
+        if (card) {
+            card.scrollIntoView({behavior:'smooth', block:'center'});
+            card.classList.add('highlighted');
+            setTimeout(() => card.classList.remove('highlighted'), 3000);
+        }
+    });
+}
+
+function highlightFinding(findingId) {
+    const el = document.getElementById(`finding-${findingId}`);
+    if (el) {
+        el.scrollIntoView({behavior:'smooth', block:'center'});
+        el.classList.add('highlighted');
+        setTimeout(() => el.classList.remove('highlighted'), 3000);
+    }
+}
+
+// ══════════════════════════════════════════════════════════
+// Utilities
+// ══════════════════════════════════════════════════════════
+
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+// ── Start ──
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

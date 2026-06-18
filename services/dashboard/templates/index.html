@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Agent Space</title>
+    <link rel="icon" type="image/svg+xml" href="/static/icons/aws/aws-cloud.svg">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #334155; margin-bottom: 16px; }
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+        .header-brand img { width: 28px; height: 28px; border-radius: 50%; }
+        .header-brand h1 { font-size: 1.2rem; color: #f8fafc; display: flex; align-items: center; gap: 6px; }
+        .header-brand h1 .aws { color: #FF9900; font-weight: 700; }
+        .header-brand h1 .product { color: #e2e8f0; font-weight: 500; }
+        .header-actions { display: flex; align-items: center; gap: 8px; }
+        .powered-by { display: flex; align-items: center; gap: 5px; font-size: 0.62rem; color: #94a3b8; }
+        .powered-by img { width: 18px; height: 18px; border-radius: 50%; }
+        h1 { font-size: 1.5rem; color: #f8fafc; }
+        h1 span { color: #38bdf8; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+        .tab { padding: 8px 16px; border-radius: 8px 8px 0 0; cursor: pointer; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-bottom: none; font-size: 0.85rem; transition: all 0.2s; }
+        .tab:hover { color: #f8fafc; }
+        .tab.active { background: #334155; color: #38bdf8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .category { background: #1e293b; border-radius: 12px; padding: 14px; border: 1px solid #334155; margin-bottom: 14px; }
+        .category-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
+        .category-name { font-size: 1rem; font-weight: 600; }
+        .scenario-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .scenario-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; position: relative; }
+        .scenario-card:hover { border-color: #38bdf8; transform: translateY(-1px); }
+        .scenario-card .name { font-weight: 500; font-size: 0.85rem; margin-bottom: 3px; }
+        .scenario-card .meta { font-size: 0.72rem; color: #64748b; }
+        .scenario-card .steps-badge { position: absolute; top: 6px; right: 6px; background: #334155; color: #94a3b8; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; }
+        /* Scenario Detail Page */
+        #scenarioPage { display: none; }
+        .sc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #334155; }
+        .sc-back { background: none; border: 1px solid #475569; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .sc-back:hover { color: #f8fafc; border-color: #94a3b8; }
+        .sc-title { font-size: 1.3rem; font-weight: 700; }
+        .sc-id { color: #64748b; font-size: 0.8rem; }
+        /* Section layout */
+        .sc-section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+        .sc-section-title { font-size: 0.9rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        /* Info cards */
+        .sc-info { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+        .sc-info-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 160px; }
+        .sc-info-card h4 { font-size: 0.68rem; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+        .sc-info-card p { font-size: 0.82rem; color: #cbd5e1; line-height: 1.4; }
+        .expected-box { background: #0f172a; border: 1px solid #22c55e; border-radius: 6px; padding: 8px 10px; color: #86efac; font-size: 0.8rem; }
+        .cmd-box { background: #0f172a; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 0.75rem; color: #fbbf24; white-space: pre-wrap; word-break: break-all; max-height: 60px; overflow-y: auto; }
+        /* Action bar */
+        .sc-actions { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 8px 14px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-run { background: #22c55e; color: #0f172a; }
+        .btn-run:hover { background: #4ade80; }
+        .btn-run:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+        .btn-restore { background: #f59e0b; color: #0f172a; }
+        .btn-restore:hover { background: #fbbf24; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #f87171; }
+        .btn-secondary { background: #334155; color: #e2e8f0; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #60a5fa; }
+        /* Run banner */
+        .run-banner { padding: 10px 14px; border-radius: 6px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85rem; }
+        .run-banner.pass { background: #14532d; color: #86efac; border: 1px solid #22c55e; }
+        .run-banner.fail { background: #450a0a; color: #fca5a5; border: 1px solid #ef4444; }
+        .run-banner.partial { background: #422006; color: #fde68a; border: 1px solid #f59e0b; }
+        .run-banner.running { background: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; }
+        /* Timeline */
+        .tl-step { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-left: 2px solid #334155; margin-left: 10px; padding-left: 16px; position: relative; }
+        .tl-step::before { content: ''; position: absolute; left: -6px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: #334155; }
+        .tl-step.pass::before { background: #22c55e; }
+        .tl-step.fail::before { background: #ef4444; }
+        .tl-step.checking::before { background: #f59e0b; animation: pulse 1s infinite; }
+        .tl-step.pending::before { background: #475569; }
+        .tl-step.skipped::before { background: #64748b; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .tl-name { font-weight: 500; font-size: 0.82rem; }
+        .tl-detail { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+        .tl-elapsed { font-size: 0.7rem; color: #64748b; margin-top: 1px; }
+        /* Slack messages */
+        .slack-msg { padding: 12px 14px; border-bottom: 1px solid #0f172a; font-size: 0.82rem; line-height: 1.6; }
+        .slack-msg:last-child { border-bottom: none; }
+        .slack-msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .slack-msg-icon { font-size: 1.1rem; }
+        .slack-msg-time { font-size: 0.68rem; color: #64748b; }
+        .slack-msg-type { font-size: 0.68rem; color: #38bdf8; font-weight: 600; background: #1e3a5f; padding: 1px 6px; border-radius: 4px; }
+        .slack-msg-original { color: #64748b; font-size: 0.78rem; margin-bottom: 4px; font-style: italic; }
+        .slack-msg-translated { color: #e2e8f0; }
+        .slack-msg-translated b { color: #f8fafc; }
+        .slack-msg.empty { color: #64748b; text-align: center; padding: 20px; font-size: 0.82rem; }
+        /* History table */
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .history-table th { text-align: left; padding: 6px 8px; color: #64748b; font-size: 0.72rem; border-bottom: 1px solid #334155; }
+        .history-table td { padding: 6px 8px; border-bottom: 1px solid #1e293b; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .badge.pass { background: #14532d; color: #86efac; }
+        .badge.fail { background: #450a0a; color: #fca5a5; }
+        .badge.partial { background: #422006; color: #fde68a; }
+        /* AI Analysis */
+        .ai-body { min-height: 80px; max-height: 500px; overflow-y: auto; }
+        .ai-placeholder { color: #64748b; font-size: 0.82rem; text-align: center; padding: 20px; }
+        .ai-result { font-size: 0.85rem; line-height: 1.7; color: #cbd5e1; }
+        .ai-result h1,.ai-result h2,.ai-result h3,.ai-result h4 { color: #38bdf8; margin: 12px 0 6px; }
+        .ai-result strong { color: #f8fafc; }
+        .ai-result ul,.ai-result ol { padding-left: 20px; margin: 6px 0; }
+        /* Environment */
+        .env-section { background: #1e293b; border-radius: 10px; padding: 14px; border: 1px solid #334155; margin-bottom: 14px; }
+        .env-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+        .env-item { background: #0f172a; border-radius: 6px; padding: 8px; border: 1px solid #334155; font-size: 0.82rem; }
+        .env-item .label { color: #64748b; font-size: 0.72rem; }
+        .env-item .value { color: #e2e8f0; font-weight: 500; margin-top: 2px; }
+        .env-item.ok .value { color: #22c55e; }
+        .env-item.warn .value { color: #f59e0b; }
+        .env-item.error .value { color: #ef4444; }
+        /* History main tab */
+        .history-filter { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+        .history-filter select { padding: 5px 8px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.78rem; }
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; display: none; }
+        .modal-overlay.show { display: flex; align-items: center; justify-content: center; }
+        .modal { background: #1e293b; border-radius: 12px; padding: 24px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; border: 1px solid #334155; }
+        .modal h2 { margin-bottom: 14px; font-size: 1.1rem; }
+        .modal label { display: block; font-size: 0.78rem; color: #94a3b8; margin-bottom: 3px; margin-top: 10px; }
+        .modal input, .modal textarea, .modal select { width: 100%; padding: 7px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.82rem; font-family: inherit; }
+        .modal textarea { min-height: 70px; font-family: monospace; }
+        .modal .modal-btns { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+        .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) { .sc-info { flex-direction: column; } }
+        /* Layer stack layout */
+        .layer-stack { display: flex; flex-direction: column; gap: 0; }
+        .layer-block { border-radius: 0; border: none; border-bottom: 1px solid #0f172a; position: relative; transition: all 0.2s; }
+        .layer-block:first-child { border-radius: 12px 12px 0 0; }
+        .layer-block:last-child { border-radius: 0 0 12px 12px; border-bottom: none; }
+        .layer-block:only-child { border-radius: 12px; }
+        .layer-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; user-select: none; }
+        .layer-header:hover { filter: brightness(1.1); }
+        .layer-badge { font-size: 1.1rem; }
+        .layer-name { font-size: 0.9rem; font-weight: 700; }
+        .layer-desc { font-size: 0.72rem; opacity: 0.7; margin-left: 4px; }
+        .layer-count { margin-left: auto; font-size: 0.72rem; opacity: 0.7; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px; }
+        .layer-chevron { font-size: 0.7rem; opacity: 0.6; transition: transform 0.2s; }
+        .layer-chevron.open { transform: rotate(90deg); }
+        .layer-body { padding: 0 16px 14px; }
+        .layer-body.collapsed { display: none; }
+        .layer-indent { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 12px; }
+        .arch-diagram { background: #0f172a; border-radius: 8px; padding: 16px; overflow-x: auto; margin-bottom: 14px; }
+        .arch-node rect { rx: 8; ry: 8; stroke-width: 1.5; }
+        .arch-node.app rect { fill: #1e3a5f; stroke: #3b82f6; }
+        .arch-node.infra rect { fill: #1a2e1a; stroke: #22c55e; }
+        .arch-node.aws rect { fill: #2d1f00; stroke: #f59e0b; }
+        .arch-node.agent rect { fill: #2d1a2d; stroke: #a855f7; }
+        .arch-node.fault rect { stroke-width: 2.5; }
+        .arch-node.app.fault rect { stroke: #ef4444; fill: #450a0a; }
+        .arch-node.aws.fault rect { stroke: #ef4444; fill: #450a0a; }
+        .arch-node.agent.fault rect { stroke: #ef4444; fill: #450a0a; }
+        .arch-node text { fill: #e2e8f0; font-size: 12px; font-weight: 600; font-family: -apple-system, sans-serif; }
+        .arch-node .subdesc { fill: #64748b; font-size: 10px; font-weight: 400; }
+        .arch-edge { stroke: #334155; stroke-width: 1.5; fill: none; }
+        .arch-edge.fault { stroke: #ef4444; stroke-width: 2; stroke-dasharray: 6,3; animation: dash 1s linear infinite; }
+        .arch-edge-label { fill: #64748b; font-size: 9px; font-family: -apple-system, sans-serif; }
+        @keyframes dash { to { stroke-dashoffset: -18; } }
+        /* Flow steps */
+        .flow-step { display: flex; align-items: center; flex-shrink: 0; }
+        .flow-node { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: #94a3b8; text-align: center; min-width: 90px; max-width: 130px; transition: all 0.3s; }
+        .flow-node.active { border-color: #f59e0b; color: #fde68a; background: #422006; }
+        .flow-node.done { border-color: #22c55e; color: #86efac; background: #14532d; }
+        .flow-node.fault-node { border-color: #ef4444; color: #fca5a5; background: #450a0a; }
+        .flow-arrow { color: #475569; font-size: 1.1rem; padding: 0 2px; flex-shrink: 0; }
+        .flow-arrow.fault { color: #ef4444; }
+        /* Investigation summary */
+        .inv-phase { border: 1px solid #334155; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        .inv-phase-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #1e293b; }
+        .inv-phase-name { font-weight: 600; font-size: 0.85rem; }
+        .inv-phase-assessment { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: #14532d; color: #86efac; }
+        .inv-msg { padding: 8px 14px; border-bottom: 1px solid #0f172a; }
+        .inv-msg:last-child { border-bottom: none; }
+        .inv-msg-summary { font-size: 0.85rem; color: #e2e8f0; line-height: 1.5; }
+        .inv-msg-toggle { font-size: 0.7rem; color: #64748b; cursor: pointer; margin-top: 4px; user-select: none; }
+        .inv-msg-toggle:hover { color: #94a3b8; }
+        .inv-msg-original { display: none; font-size: 0.75rem; color: #475569; margin-top: 6px; padding: 8px; background: #0f172a; border-radius: 4px; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto; }
+        .inv-msg-original.show { display: block; }
+        .inv-overall { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; margin-top: 10px; }
+        .inv-score { font-size: 1.3rem; font-weight: 700; display: inline-block; }
+        .inv-score.good { color: #22c55e; }
+        .inv-score.mid { color: #f59e0b; }
+        .inv-score.bad { color: #ef4444; }
+        /* DAG styles */
+        .dag-container { display: flex; flex-direction: row; align-items: flex-start; gap: 0; overflow-x: auto; padding: 8px 0; }
+        .dag-triage-col { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; min-height: 60px; }
+        .dag-branches { display: flex; flex-direction: column; gap: 6px; }
+        .dag-branch { display: flex; flex-direction: row; align-items: center; gap: 0; }
+        .dag-node { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; font-size: 0.72rem; color: #94a3b8; text-align: center; min-width: 80px; max-width: 160px; flex-shrink: 0; transition: all 0.3s; overflow: hidden; }
+        .dag-node-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+        .dag-node-sublabel { font-size: 0.62rem; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dag-connector { color: #475569; font-size: 0.9rem; padding: 0 2px; flex-shrink: 0; }
+        .dag-branch-connector { color: #475569; font-size: 0.9rem; padding: 0 4px; flex-shrink: 0; display: flex; align-items: center; }
+        .dag-node-rejected { border-color: #ef4444; color: #fca5a5; }
+        .dag-node-confirmed { border-color: #22c55e; color: #86efac; }
+        .dag-node-partial { border-color: #f59e0b; color: #fde68a; }
+        .dag-node-triage { border-color: #94a3b8; color: #e2e8f0; }
+        .dag-node-key { border-width: 2px; border-style: solid; }
+        .dag-node-progress { border-color: #f59e0b; color: #fde68a; animation: pulse 1s infinite; }
+    </style>
+    <link rel="stylesheet" href="/static/css/evidence.css">
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-brand">
+            <img src="/static/icons/aws/aws-cloud.svg" alt="AWS">
+            <h1><span class="aws">AWS</span> <span class="product">Agent Space</span></h1>
+            <div class="powered-by">
+                <img src="/static/icons/aws/devops-agent.svg" alt="DevOps Agent">
+                DevOps Agent
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary btn-sm" onclick="showCreateModal()">+ 시나리오 추가</button>
+        </div>
+    </header>
+
+    <!-- Supported Data Sources -->
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;margin-bottom:12px;background:#1e293b;border-radius:8px;border:1px solid #334155;overflow-x:auto;">
+        <span style="font-size:0.58rem;color:#64748b;white-space:nowrap;font-weight:600;">Supported</span>
+        <img src="/static/icons/aws/cloudwatch.svg" style="width:22px;height:22px;border-radius:50%" title="Amazon CloudWatch">
+        <img src="/static/icons/aws/xray.svg" style="width:22px;height:22px;border-radius:50%" title="AWS X-Ray">
+        <img src="/static/icons/aws/eks.svg" style="width:22px;height:22px;border-radius:50%" title="Amazon EKS">
+        <img src="/static/icons/aws/fis.svg" style="width:22px;height:22px;border-radius:50%" title="AWS FIS">
+        <img src="/static/icons/aws/bedrock.svg" style="width:22px;height:22px;border-radius:50%" title="Amazon Bedrock">
+        <img src="/static/icons/aws/security-hub.svg" style="width:22px;height:22px;border-radius:50%" title="AWS Security Hub">
+        <img src="/static/icons/aws/sns.svg" style="width:22px;height:22px;border-radius:50%" title="Amazon SNS">
+        <img src="/static/icons/aws/eventbridge.svg" style="width:22px;height:22px;border-radius:50%" title="Amazon EventBridge">
+        <img src="/static/icons/aws/lambda.svg" style="width:22px;height:22px;border-radius:50%" title="AWS Lambda">
+        <img src="/static/icons/aws/devops-agent.svg" style="width:22px;height:22px;border-radius:50%" title="AWS DevOps Agent">
+    </div>
+
+    <!-- ══ Main List View ══ -->
+    <div id="mainView">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('scenarios')"><img src="/static/icons/aws/fis.svg" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;border-radius:50%"> 시나리오</div>
+            <div class="tab" onclick="switchTab('history')"><img src="/static/icons/aws/cloudwatch.svg" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;border-radius:50%"> 실행 이력</div>
+            <div class="tab" onclick="switchTab('environment')"><img src="/static/icons/aws/eks.svg" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;border-radius:50%"> 인프라 모니터링</div>
+        </div>
+        <div id="tab-scenarios" class="tab-content active">
+            <div style="font-size:0.75rem;color:#64748b;margin-bottom:12px;padding:8px 12px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
+                레이어 구조: <span style="color:#7c3aed;">Composite</span> → <span style="color:#dc2626;">Application</span> → <span style="color:#2563eb;">Kubernetes</span> → <span style="color:#d97706;">AWS Infrastructure</span>
+            </div>
+            <div class="layer-stack">
+            {% for cat_id, cat in categories.items() %}
+            <div class="layer-block" style="background: color-mix(in srgb, {{ cat.color }} 15%, #0f172a);">
+                <div class="layer-header" style="border-left: 4px solid {{ cat.color }};" onclick="toggleLayer('layer-{{ cat_id }}', this)">
+                    <span class="layer-badge">{{ cat.icon }}</span>
+                    <span class="layer-name" style="color: {{ cat.color }};">{{ cat.name }}</span>
+                    <span class="layer-desc">{{ cat.desc }}</span>
+                    <span class="layer-count">{{ cat.scenarios|length }}개</span>
+                    <span class="layer-chevron open">▶</span>
+                </div>
+                <div class="layer-body" id="layer-{{ cat_id }}">
+                    <div class="layer-indent">
+                        <div class="scenario-grid">
+                            {% for s in cat.scenarios %}
+                            <div class="scenario-card" onclick='openScenario({{ s | tojson }})' style="border-left: 3px solid {{ cat.color }}40;">
+                                <div class="name">{{ s.name }}</div>
+                                <div class="meta">{{ s.id }} · {{ s.layer }}</div>
+                                {% if s.verification and s.verification.steps %}
+                                <span class="steps-badge">{{ s.verification.steps|length }} steps</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        <div id="tab-history" class="tab-content">
+            <div class="history-filter">
+                <select id="historyFilter" onchange="loadHistory()">
+                    <option value="all">전체 이력</option>
+                    <option value="recent">최근 10건</option>
+                    <option value="pass">PASS만</option>
+                    <option value="fail">FAIL만</option>
+                </select>
+                <select id="historyScenarioFilter" onchange="loadHistory()"><option value="">모든 시나리오</option></select>
+                <button class="btn btn-secondary btn-sm" onclick="loadHistory()">🔄</button>
+            </div>
+            <div id="historyContent"><p style="color:#64748b;">탭 선택 시 로딩됩니다.</p></div>
+        </div>
+        <div id="tab-environment" class="tab-content">
+            <div id="envContent"><p style="color:#64748b;">탭 선택 시 로딩됩니다.</p></div>
+        </div>
+    </div>
+
+    <!-- ══ Scenario Detail Page ══ -->
+    <div id="scenarioPage">
+        <div class="sc-header">
+            <button class="sc-back" onclick="backToList()">← 목록</button>
+            <div>
+                <div class="sc-title" id="scTitle"></div>
+                <div class="sc-id" id="scId"></div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-run" id="btnRun" onclick="runScenario()">▶ 실행 & 검증</button>
+                <button class="btn btn-restore" id="btnRestore" onclick="restoreScenario()" style="display:none;">↩ 복원</button>
+                <button class="btn btn-danger btn-sm" id="btnCancel" onclick="cancelRun()" style="display:none;">⏹ 취소</button>
+                <span id="runTimer" style="color:#64748b;font-size:0.8rem;"></span>
+                <button class="btn btn-danger btn-sm" onclick="deleteScenario()">🗑 삭제</button>
+            </div>
+        </div>
+
+        <!-- 섹션1: 시나리오 상세 + 실행 상태 -->
+        <div class="sc-section">
+            <div class="sc-section-title">📋 시나리오 상세 &amp; 실행 상태</div>
+            <div class="sc-info">
+                <div class="sc-info-card">
+                    <h4>🎯 목적</h4>
+                    <p id="scPurpose"></p>
+                </div>
+                <div class="sc-info-card">
+                    <h4>✅ 기대 진단</h4>
+                    <div class="expected-box" id="scExpected"></div>
+                </div>
+                <div class="sc-info-card">
+                    <h4>💻 트리거</h4>
+                    <div class="cmd-box" id="scCommand"></div>
+                </div>
+            </div>
+            <!-- 아키텍처 다이어그램 -->
+            <div id="archDiagram" style="display:none;"></div>
+            <!-- 검증 목표 -->
+            <div id="investigationGoal" style="display:none;margin-bottom:14px;"></div>
+            <!-- 정상 흐름 -->
+            <div id="normalFlowSection" style="display:none;margin-bottom:14px;"></div>
+            <!-- 장애 흐름 -->
+            <div id="flowDiagram" style="display:none;margin-bottom:14px;">
+                <div style="font-size:0.72rem;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">🔴 장애 흐름</div>
+                <div id="flowSteps" style="display:flex;align-items:center;flex-wrap:wrap;gap:0;padding-bottom:4px;"></div>
+            </div>
+            <!-- Investigation DAG -->
+            <div id="investigationDagSection" style="display:none;margin-bottom:14px;">
+                <div style="font-size:0.72rem;color:#38bdf8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">조사 흐름 DAG</div>
+                <div id="dagContainer"></div>
+                <div id="dagError" style="display:none;font-size:0.72rem;color:#f87171;margin-top:4px;"></div>
+            </div>
+            <div id="colRun">
+                <p style="color:#64748b;font-size:0.82rem;">실행 버튼을 눌러 시나리오를 시작하세요.</p>
+            </div>
+        </div>
+
+        <!-- 섹션2: Evidence 증거 브라우저 -->
+        <div class="sc-section" id="evidenceSection">
+            <div class="sc-section-title">
+                🔬 Evidence 증거 브라우저
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button class="btn btn-secondary btn-sm" onclick="window.open('/evidence?task_id='+encodeURIComponent(currentTaskId),'_blank')" style="padding:3px 8px;font-size:0.68rem;">↗ 새 탭</button>
+                </div>
+            </div>
+            <div id="evidenceContainer">
+                <div class="ai-placeholder" id="evidencePlaceholder">조사 완료 후 Evidence 증거가 여기에 표시됩니다.</div>
+            </div>
+        </div>
+
+        <!-- 섹션3: 가설 분석 & Rubric 평가 -->
+        <div class="sc-section">
+            <div class="sc-section-title">
+                🎯 가설 분석 & 평가 <span id="taskIdDisplay" style="font-size:0.65rem;color:#475569;font-weight:400;margin-left:8px;"></span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <select id="modelSelect" style="padding:3px 8px;font-size:0.68rem;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;">
+                        <option value="opus">Opus 4.6 (최고)</option>
+                        <option value="sonnet">Sonnet 4 (균형)</option>
+                        <option value="haiku">Haiku (빠름)</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="runAnalysisAndRubric()" style="padding:4px 12px;font-size:0.75rem;">🔍 분석 & 평가 실행</button>
+                </div>
+            </div>
+            <div style="display:flex;gap:12px;">
+                <!-- 왼쪽: 가설 분석 (Bedrock) -->
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.72rem;color:#38bdf8;margin-bottom:8px;">📊 가설 분석</div>
+                    <div id="hypothesisContent"><div class="slack-msg empty">조사 완료 후 자동 분석됩니다.</div></div>
+                </div>
+                <!-- 오른쪽: Rubric 평가 (Bedrock) -->
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.72rem;color:#fbbf24;margin-bottom:8px;">📊 Rubric 평가</div>
+                    <div id="colRubricEval"><div class="slack-msg empty">조사 완료 후 자동 평가됩니다.</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ev-toast" id="toast"></div>
+    </div>
+    <!-- Side Panel for raw messages -->
+    <div id="sidePanel" style="display:none;position:fixed;top:0;right:0;width:400px;height:100%;background:#1e293b;border-left:1px solid #334155;z-index:100;overflow-y:auto;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-weight:600;color:#94a3b8;">📝 원본 메시지</span>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sidePanel').style.display='none'">✕</button>
+        </div>
+        <div id="sidePanelContent" style="font-size:0.82rem;color:#e2e8f0;line-height:1.6;"></div>
+    </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-overlay" id="createModal">
+    <div class="modal">
+        <h2>➕ 새 시나리오 추가</h2>
+        <label>ID</label><input id="cId" placeholder="예: C08-cascading-latency">
+        <label>이름</label><input id="cName" placeholder="예: Cascading Latency">
+        <label>카테고리</label>
+        <select id="cCategory"><option value="application">Application</option><option value="kubernetes">Kubernetes</option><option value="aws">AWS Infrastructure</option><option value="composite">Composite</option><option value="cleanup">Cleanup</option></select>
+        <label>Layer</label><input id="cLayer" placeholder="예: Application → Performance">
+        <label>목적</label><input id="cPurpose">
+        <label>기대 Root Cause</label><input id="cExpected">
+        <label>트리거 명령어</label><textarea id="cTrigger"></textarea>
+        <label>복원 명령어 (선택)</label><textarea id="cRestore" style="min-height:40px;"></textarea>
+        <label>흐름 (줄바꿈 구분)</label><textarea id="cFlow"></textarea>
+        <label>검증 단계 (JSON 배열)</label><textarea id="cVerification" style="min-height:80px;"></textarea>
+        <div class="modal-btns">
+            <button class="btn btn-secondary btn-sm" onclick="closeCreateModal()">취소</button>
+            <button class="btn btn-run btn-sm" onclick="createScenario()">생성</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/evidence-renderer.js"></script>
+<script src="/static/js/hypothesis_dag.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

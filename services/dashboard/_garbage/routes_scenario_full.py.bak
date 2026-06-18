@@ -1,0 +1,2665 @@
+"""
+Scenario routes — extracted from overview_app.py as a Flask Blueprint.
+
+Includes:
+- Scenario Generation from Recommendations (generate, validate, save)
+- Scenario Tab — List, Detail, Run Proxy, Chat, Evaluate, Improvements
+"""
+import json
+import os
+import re
+import subprocess
+import time
+import threading
+import traceback
+
+from flask import Blueprint, Response, jsonify, request
+
+import prompts as _prompts
+
+from app_config import (
+    _CFG, _cfg_get, AWS_REGION, AGENT_SPACE_ID, RUNS_TABLE, AWS_PROFILE,
+    _req_space_id, _agent_space_id, _boto_session,
+    AVAILABLE_MODELS,
+)
+from routes_arch import (
+    _arch_table,
+    _load_latest_arch, _list_scenarios, _get_scenario, _save_scenario,
+    _delete_scenario,
+)
+
+scenario_bp = Blueprint("scenario_bp", __name__)
+
+
+def _get_space_app_names(space_id: str) -> set:
+    """Space에 속한 앱/서비스 이름 목록. 토폴로지 결과 → App 태그 fallback.
+
+    group 이름 + 개별 서비스 이름을 모두 포함하여 보안 시나리오 매칭에 사용.
+    """
+    apps = set()
+    try:
+        saved = _load_latest_arch(space_id)
+        if saved:
+            nodes = saved.get("graph", {}).get("nodes", [])
+            for n in nodes:
+                if n.get("service_type") == "boundary":
+                    continue
+                g = n.get("group", "")
+                if g:
+                    apps.add(g)
+                name = n.get("name", "")
+                if name:
+                    apps.add(name)
+            if apps:
+                return apps
+    except Exception:
+        pass
+    try:
+        from app_config import _tag_value_for_space
+        tag_val = _tag_value_for_space(space_id)
+        if tag_val:
+            apps.add(tag_val)
+    except Exception:
+        pass
+    return apps
+
+
+def _app_matches_space(sec_app: str, space_apps: set) -> bool:
+    """보안 시나리오의 app_name이 Space의 앱/서비스와 매칭되는지 확인."""
+    sec_lower = sec_app.lower()
+    if sec_app in space_apps:
+        return True
+    for app in space_apps:
+        if sec_lower in app.lower() or app.lower() in sec_lower:
+            return True
+    return False
+
+
+@scenario_bp.route("/api/scenario-apps")
+def api_scenario_apps():
+    """시나리오 대상 앱 목록. 환경의 App 태그에서 직접 조회."""
+    space_id = _req_space_id()
+    apps = []
+
+    # 1) 토폴로지 분석 결과에서 앱+서비스 목록
+    try:
+        saved = _load_latest_arch(space_id)
+        if saved:
+            nodes = saved.get("graph", {}).get("nodes", [])
+            groups = {}
+            for n in nodes:
+                g = n.get("group", "")
+                if g and n.get("service_type") != "boundary":
+                    groups.setdefault(g, []).append(n["name"])
+            for g_name, svcs in groups.items():
+                apps.append({"name": g_name, "count": len(svcs),
+                             "services": svcs, "source": "topology"})
+    except Exception:
+        pass
+
+    # 2) 분석 결과 없으면 Space App 태그
+    if not apps:
+        try:
+            from app_config import _tag_value_for_space
+            tag_val = _tag_value_for_space(space_id)
+            if tag_val:
+                apps.append({"name": tag_val, "count": 0,
+                             "services": [], "source": "tag"})
+        except Exception:
+            pass
+
+    return jsonify({"ok": True, "apps": apps, "space_id": space_id})
+
+
+# ===================================================================
+# Scenario Generation from Recommendations
+# ===================================================================
+
+@scenario_bp.route("/api/arch/generate-scenario", methods=["POST"])
+def api_arch_generate_scenario():
+    """Generate executable scenario JSON from an architecture recommendation."""
+    from arch_analysis import ScenarioGenerator, ServiceGraph
+    from botocore.config import Config as BotoConfig
+
+    body = request.json or {}
+    recommendation = body.get("recommendation")
+    if not recommendation:
+        return jsonify({"ok": False, "error": "recommendation required"}), 400
+
+    space_id = _req_space_id("json")
+    model_key = body.get("model", "opus")
+    model_id = AVAILABLE_MODELS.get(model_key, AVAILABLE_MODELS["opus"])
+
+    saved = None
+    try:
+        saved = _load_latest_arch(space_id)
+    except Exception:
+        pass
+    if not saved or not saved.get("graph"):
+        return jsonify({"ok": False, "error": "Run architecture discovery first"}), 400
+
+    try:
+        graph = ServiceGraph.from_dict(saved["graph"])
+
+        existing_items = _list_scenarios(space_id)
+        existing_ids = [s.get("id", "") for s in existing_items]
+        all_scenarios = {}
+        for sid in existing_ids:
+            sc = _get_scenario(space_id, sid)
+            if sc:
+                all_scenarios[sid] = sc
+
+        scenario_id = ScenarioGenerator.next_generated_id(existing_ids)
+        short_name = (recommendation.get("name", "generated") or "generated")
+        short_name = re.sub(r"[^a-zA-Z0-9가-힣\-]", "-", short_name)[:30].strip("-").lower()
+        scenario_id = f"{scenario_id}-{short_name}"
+
+        alarms = []
+        try:
+            session = _boto_session()
+            cw = session.client("cloudwatch")
+            paginator = cw.get_paginator("describe_alarms")
+            for page in paginator.paginate(StateValue="OK", MaxRecords=100):
+                for a in page.get("MetricAlarms", []):
+                    alarms.append({
+                        "name": a["AlarmName"],
+                        "metric": a.get("MetricName", ""),
+                        "namespace": a.get("Namespace", ""),
+                        "dimensions": a.get("Dimensions", []),
+                        "threshold": a.get("Threshold"),
+                        "period": a.get("Period"),
+                        "eval_periods": a.get("EvaluationPeriods"),
+                        "statistic": a.get("Statistic", ""),
+                    })
+                if len(alarms) > 50:
+                    break
+        except Exception:
+            pass
+
+        fis_templates = []
+        try:
+            from credential_resolver import credentials
+            for acct in credentials.list_accounts():
+                try:
+                    sess = resolver.get_session(acct.account_id)
+                    fis = sess.client("fis")
+                    resp = fis.list_experiment_templates(maxResults=20)
+                    for t in resp.get("experimentTemplates", []):
+                        fis_templates.append({
+                            "id": t["id"],
+                            "description": t.get("description", ""),
+                            "tags": t.get("tags", {}),
+                            "account_id": acct.account_id,
+                            "profile": acct.profile,
+                        })
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        context = {
+            "scenario_id": scenario_id,
+            "scenarios": all_scenarios,
+            "alarms": alarms,
+            "fis_templates": fis_templates,
+        }
+
+        session = _boto_session()
+        bedrock = session.client("bedrock-runtime", config=BotoConfig(read_timeout=300))
+        generator = ScenarioGenerator(bedrock, model_id=model_id)
+        scenario = generator.generate(recommendation, graph, context)
+
+        return jsonify({"ok": True, "scenario": scenario, "model": model_key})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ---------------------------------------------------------------------------
+# Scenario validation helpers
+# ---------------------------------------------------------------------------
+
+SCENARIO_PLACEHOLDER_VARS_GLOBAL = {"PROJECT_NAME", "AWS_ACCOUNT_ID", "AWS_REGION", "ECR_REGISTRY", "NAMESPACE", "FIS_EXPERIMENT_ID"}
+
+SCENARIO_VALIDATION_RULES = """\
+- trigger.command는 단일 문자열 (commands 배열 금지, 여러 명령은 && 연결)
+- 환경 변수: 글로벌({allowed}) + 시나리오 variables에 선언된 변수만 허용
+- trigger가 생성하는 리소스 이름 = verification이 참조하는 이름 (일치 필수)
+- trigger에서 kubectl run으로 pod 생성 시, verification의 kubectl_check에서 동일한 pod 이름 사용
+- evaluation_rubric weight 합계 = 100
+- metric_check dimensions에 PodName, InstanceId 등 변동성 값 사용 금지 (ClusterName, Namespace만 사용)
+- kubectl run 일회성 pod의 kubectl_check expected는 Succeeded (Running 아님)""".format(
+    allowed=", ".join(f"${{{v}}}" for v in sorted(SCENARIO_PLACEHOLDER_VARS_GLOBAL))
+)
+
+
+def _extract_created_resources(cmd):
+    """Extract resource names created/manipulated by a trigger command."""
+    names = set()
+    if not cmd:
+        return names
+    for part in re.split(r'\s*&&\s*', cmd):
+        tokens = part.split()
+        if len(tokens) < 3:
+            continue
+        if "kubectl" not in tokens[0] and tokens[0] != "kubectl":
+            continue
+        for i, t in enumerate(tokens):
+            if t == "run" and i + 1 < len(tokens):
+                name = tokens[i + 1].lstrip("-")
+                if name and not name.startswith("-"):
+                    names.add(name)
+            elif t == "create" and i + 2 < len(tokens):
+                name = tokens[i + 2].lstrip("-")
+                if name and not name.startswith("-"):
+                    names.add(name)
+            elif t == "--name" and i + 1 < len(tokens):
+                names.add(tokens[i + 1])
+    return names
+
+
+def _extract_referenced_resources(steps):
+    """Extract ephemeral resource names that verification expects to exist.
+
+    Includes pod/resource names from kubectl_check steps (trigger에서 만든 리소스 확인용).
+    Pre-existing deployments/services (get deploy, get svc)는 제외.
+    """
+    names = set()
+    _skip_resources = {"deploy", "deployment", "deployments", "svc", "service", "services",
+                       "node", "nodes", "namespace", "namespaces", "configmap", "secret"}
+    for s in (steps or []):
+        cfg = s if isinstance(s, dict) else {}
+        stype = cfg.get("type", "")
+        if stype != "kubectl_check":
+            continue
+        for field in ("pod", "service"):
+            v = cfg.get(field, "")
+            if v:
+                names.add(v)
+        cmd = cfg.get("command", "")
+        if cmd:
+            tokens = cmd.split()
+            for i, t in enumerate(tokens):
+                if t in ("get", "describe", "logs", "delete"):
+                    if i + 1 < len(tokens) and tokens[i + 1].lower() in _skip_resources:
+                        continue
+                    if t == "get" and i + 1 < len(tokens) and tokens[i + 1].lower() in ("pod", "pods"):
+                        if i + 2 < len(tokens) and not tokens[i + 2].startswith("-"):
+                            names.add(tokens[i + 2])
+                    elif i + 2 < len(tokens) and not tokens[i + 2].startswith("-"):
+                        resource_type = tokens[i + 1] if i + 1 < len(tokens) else ""
+                        if resource_type.lower() not in _skip_resources:
+                            names.add(tokens[i + 2])
+                elif t in ("pods", "pod"):
+                    if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                        names.add(tokens[i + 1])
+    return names
+
+
+def _find_undefined_vars(text, scenario_vars=None):
+    """Find ${VAR} references not in global + scenario-declared + bash-local variables."""
+    if not text:
+        return []
+    allowed = SCENARIO_PLACEHOLDER_VARS_GLOBAL | set(scenario_vars or [])
+    bash_defined = set(re.findall(r'\b([A-Z_][A-Z0-9_]*)=', text))
+    allowed = allowed | bash_defined
+    found = re.findall(r'\$\{([A-Z_][A-Z0-9_]*)\}', text)
+    return [v for v in found if v not in allowed]
+
+
+def _fix_scenario(scenario):
+    """Agent 생성 시나리오 자동 교정. 교정 내역 리스트 반환."""
+    fixes = []
+    trigger = scenario.get("trigger", {})
+    trigger_cmd = trigger.get("command", "") if isinstance(trigger, dict) else ""
+
+    # 1. target_service 자동 추출
+    if not scenario.get("target_service", "").strip() and trigger_cmd:
+        m = re.search(r'svc/(\w+)', trigger_cmd)
+        if not m:
+            m = re.search(r'deployment/(\w[\w-]*)', trigger_cmd)
+        if not m:
+            m = re.search(r'-l\s+app=(\w+)', trigger_cmd)
+        if not m:
+            m = re.search(r'http://(\w+)[.:/]', trigger_cmd)
+        if m:
+            scenario["target_service"] = m.group(1)
+            fixes.append(f"target_service 자동 추출: {m.group(1)}")
+    if not scenario.get("target_service", "").strip():
+        ts = scenario.get("variables", {}).get("TARGET_SERVICE", "")
+        if not ts:
+            for comp in scenario.get("architecture", {}).get("fault_path", []):
+                m2 = re.search(r'→\s*(\w+)\s*\(', comp)
+                if m2:
+                    ts = m2.group(1)
+                    break
+        if ts:
+            scenario["target_service"] = ts
+            fixes.append(f"target_service fallback 주입: {ts}")
+
+    # 2. trigger.type 자동 교정
+    if isinstance(trigger, dict) and trigger_cmd:
+        declared_type = trigger.get("type", "")
+        if "kubectl " in trigger_cmd and declared_type != "kubectl":
+            trigger["type"] = "kubectl"
+            fixes.append(f"trigger.type 교정: {declared_type} -> kubectl")
+        elif "aws fis " in trigger_cmd and declared_type != "fis":
+            trigger["type"] = "fis"
+            fixes.append(f"trigger.type 교정: {declared_type} -> fis")
+
+    # 3. --rm 제거 (kubectl run)
+    for field_path in ["trigger.command", "restore.command", "pre_cleanup.command"]:
+        parts = field_path.split(".")
+        obj = scenario.get(parts[0], {})
+        if isinstance(obj, dict) and "--rm" in obj.get(parts[1], ""):
+            obj[parts[1]] = obj[parts[1]].replace(" --rm", "")
+            fixes.append(f"{field_path}에서 --rm 제거")
+
+    # 4. kubectl_check에 logs 명령 -> 제거하고 pod 상태 확인으로 교정
+    v_steps = scenario.get("verification", {}).get("steps", [])
+    for step in v_steps:
+        if not isinstance(step, dict) or step.get("type") != "kubectl_check":
+            continue
+        cmd = step.get("command", "")
+        if "logs " in cmd or "log " in cmd:
+            svc = scenario.get("target_service", "app")
+            step["command"] = f"kubectl get pods -l app={svc} -o jsonpath={{.items[0].status.phase}}"
+            step["expected"] = "Running"
+            step["name"] = f"{svc} pod 정상 상태 확인"
+            fixes.append(f"kubectl_check 교정: logs 명령 -> pod 상태 확인")
+
+    # 5. trigger_mode 자동 추론
+    if not scenario.get("trigger_mode"):
+        has_investigation = any(
+            isinstance(s, dict) and s.get("type") == "investigation_event" for s in v_steps)
+        has_agent_inv = any(
+            isinstance(s, dict) and s.get("type") == "agent_investigation" for s in v_steps)
+        if has_investigation:
+            scenario["trigger_mode"] = "reactive"
+            fixes.append("trigger_mode 자동 추론: reactive (investigation_event 존재)")
+        elif has_agent_inv:
+            scenario["trigger_mode"] = "proactive"
+            fixes.append("trigger_mode 자동 추론: proactive (agent_investigation 존재)")
+        else:
+            scenario["trigger_mode"] = "reactive"
+            fixes.append("trigger_mode 자동 추론: reactive (기본값)")
+
+    # 6. alarm_state timeout 최소값 보장
+    for step in v_steps:
+        if not isinstance(step, dict) or step.get("type") not in ("alarm_state", "cw_alarm"):
+            continue
+        expected = step.get("expected", step.get("config", {}).get("expected", ""))
+        min_timeout = 300 if expected == "ALARM" else 180
+        current = step.get("timeout", 60)
+        if current < min_timeout:
+            step["timeout"] = min_timeout
+            fixes.append(f"alarm_state({expected}) timeout 교정: {current}s -> {min_timeout}s")
+
+    # 7. architecture/normal_flow/fault_flow 자동 생성 (토폴로지 기반)
+    target_svc = scenario.get("target_service", "")
+    if target_svc and (not scenario.get("architecture") or not scenario.get("normal_flow") or not scenario.get("fault_flow")):
+        try:
+            space_id = scenario.get("_space_id", "") or AGENT_SPACE_ID
+            saved = _load_latest_arch(space_id)
+            if saved and saved.get("graph"):
+                nodes = saved["graph"].get("nodes", [])
+                edges = saved["graph"].get("edges", [])
+                node_names = {n["name"] for n in nodes}
+
+                if not scenario.get("architecture") and nodes:
+                    components = [{"id": n["name"], "label": n["name"], "type": n.get("service_type", "app")}
+                                  for n in nodes if n.get("service_type") != "boundary"]
+                    arch_edges = [{"from": e["source"], "to": e["target"],
+                                   "label": f"{e.get('protocol', '')}:{e.get('port', '')}" if e.get("protocol") else ""}
+                                  for e in edges
+                                  if e.get("source") in node_names and e.get("target") in node_names]
+                    fault_path = []
+                    if target_svc in node_names:
+                        dependents = [e["source"] for e in edges if e.get("target") == target_svc]
+                        if dependents:
+                            fault_path = [dependents[0], target_svc]
+                            downstream = [e["target"] for e in edges if e.get("source") == target_svc]
+                            if downstream:
+                                fault_path.append(downstream[0])
+                        else:
+                            fault_path = [target_svc]
+                    scenario["architecture"] = {
+                        "components": components,
+                        "edges": arch_edges,
+                        "fault_path": fault_path,
+                    }
+                    fixes.append("architecture 토폴로지 기반 자동 생성")
+
+                if not scenario.get("normal_flow") and edges:
+                    flow = []
+                    for i, e in enumerate(edges[:8]):
+                        proto = e.get("protocol", "")
+                        port = e.get("port", "")
+                        label = f"{proto}:{port}" if proto and port else (proto or "call")
+                        flow.append({"step": f"{i+1}. {e['source']} → {e['target']}", "desc": label})
+                    scenario["normal_flow"] = flow
+                    fixes.append("normal_flow 토폴로지 기반 자동 생성")
+
+                if not scenario.get("fault_flow") and target_svc:
+                    fault_flow = []
+                    dependents = [e["source"] for e in edges if e.get("target") == target_svc]
+                    downstream = [e["target"] for e in edges if e.get("source") == target_svc]
+                    step_num = 1
+                    if dependents:
+                        for dep in dependents[:3]:
+                            fault_flow.append({"step": f"{step_num}. {dep} → {target_svc}", "desc": "장애 발생, 타임아웃/에러"})
+                            step_num += 1
+                    if downstream:
+                        for ds in downstream[:3]:
+                            fault_flow.append({"step": f"{step_num}. {target_svc} → {ds}", "desc": "장애 전파, 연쇄 영향"})
+                            step_num += 1
+                    if not fault_flow:
+                        fault_flow = [{"step": f"1. {target_svc}", "desc": "직접 장애 발생"}]
+                    scenario["fault_flow"] = fault_flow
+                    fixes.append("fault_flow 토폴로지 기반 자동 생성")
+        except Exception:
+            pass
+
+    # 8. flow 형식 보정: 문자열 배열 → {step, desc} 객체 배열
+    for flow_key in ("normal_flow", "fault_flow"):
+        flow = scenario.get(flow_key)
+        if isinstance(flow, list) and flow and isinstance(flow[0], str):
+            scenario[flow_key] = [{"step": f"{i+1}. {s.split('(')[0].strip()}", "desc": s.split('(')[-1].rstrip(')') if '(' in s else ""}
+                                  for i, s in enumerate(flow)]
+            fixes.append(f"{flow_key} 문자열→객체 변환")
+
+    return fixes
+
+
+EXPECTED_SKILL_VERSION = "2.1"
+
+
+def _validate_scenario(scenario):
+    """Validate scenario structure and consistency. Returns (errors, warnings)."""
+    errors = []
+    warnings = []
+
+    sv = scenario.get("skill_version", "")
+    if sv and sv != EXPECTED_SKILL_VERSION:
+        warnings.append(f"skill_version 불일치: 생성={sv}, 기대={EXPECTED_SKILL_VERSION} — 스킬 업데이트 필요")
+    elif not sv:
+        warnings.append(f"skill_version 누락 — 구버전 스킬로 생성된 시나리오 (기대: {EXPECTED_SKILL_VERSION})")
+
+    required = ["id", "name", "trigger", "verification", "category", "layer", "trigger_mode"]
+    missing = [f for f in required if not scenario.get(f)]
+    if missing:
+        errors.append(f"필수 필드 누락: {', '.join(missing)}")
+
+    if not scenario.get("target_service", "").strip():
+        errors.append("target_service 필수 — 장애 대상 서비스명을 최상위에 기록")
+
+    if not scenario.get("purpose"):
+        if scenario.get("description"):
+            scenario["purpose"] = scenario.pop("description")
+        else:
+            errors.append("purpose 필수 — 시나리오 목적을 1~2문장으로 기록 (description이 아닌 purpose 필드 사용)")
+
+    # 장애 흐름 필드 검증
+    for flow_field in ("architecture", "normal_flow", "fault_flow"):
+        if not scenario.get(flow_field):
+            warnings.append(f"{flow_field} 누락 — 장애 전파 시각화에 필요")
+
+    # restore 구조 검증 (rollback → restore 자동 변환)
+    if not scenario.get("restore"):
+        rollback = scenario.get("rollback")
+        if isinstance(rollback, dict):
+            steps = rollback.get("steps", [])
+            if steps:
+                cmds = [s.get("command", "") for s in steps if isinstance(s, dict) and s.get("command")]
+                scenario["restore"] = {"command": " && ".join(cmds)}
+                scenario.pop("rollback", None)
+            elif rollback.get("command"):
+                scenario["restore"] = {"command": rollback["command"]}
+                scenario.pop("rollback", None)
+    restore = scenario.get("restore", {})
+    if restore and not isinstance(restore, dict):
+        errors.append("restore는 dict여야 합니다: {\"command\": \"복원명령\"}")
+
+    # pre_cleanup 구조 검증 (list → dict 자동 변환)
+    pre_cleanup_raw = scenario.get("pre_cleanup")
+    if isinstance(pre_cleanup_raw, list):
+        cmds = [item.get("command", "") for item in pre_cleanup_raw if isinstance(item, dict) and item.get("command")]
+        scenario["pre_cleanup"] = {"command": " && ".join(cmds), "reset_alarms": [], "wait_ok_timeout": 60}
+
+    # verification.steps 구조 검증 (checks → steps 자동 변환)
+    verification = scenario.get("verification", {})
+    if isinstance(verification, dict):
+        if "checks" in verification and "steps" not in verification:
+            verification["steps"] = verification.pop("checks")
+            scenario["verification"] = verification
+        if not verification.get("steps"):
+            errors.append("verification.steps 필수 — 검증 단계 배열 필요 (checks가 아닌 steps 사용)")
+        # description → name 자동 보정
+        for step in verification.get("steps", []):
+            if isinstance(step, dict) and "name" not in step and "description" in step:
+                step["name"] = step.pop("description")
+
+    trigger = scenario.get("trigger", {})
+    if isinstance(trigger, dict):
+        if isinstance(trigger.get("commands"), list) and not trigger.get("command"):
+            trigger["command"] = " && ".join(trigger.pop("commands"))
+        if not trigger.get("command", "").strip():
+            errors.append("trigger.command 비어있음")
+    else:
+        errors.append("trigger는 dict여야 합니다")
+
+    all_commands = []
+    if isinstance(trigger, dict):
+        all_commands.append(trigger.get("command", ""))
+    restore = scenario.get("restore", {})
+    if isinstance(restore, dict):
+        all_commands.append(restore.get("command", ""))
+    pre_cleanup = scenario.get("pre_cleanup", {})
+    if isinstance(pre_cleanup, dict):
+        all_commands.append(pre_cleanup.get("command", ""))
+    v_steps = []
+    verification = scenario.get("verification", {})
+    if isinstance(verification, dict):
+        v_steps = verification.get("steps", [])
+    for step in v_steps:
+        if isinstance(step, dict):
+            all_commands.append(step.get("command", ""))
+
+    scenario_vars = set(scenario.get("variables", {}).keys())
+    bad_vars = set()
+    for cmd in all_commands:
+        bad_vars.update(_find_undefined_vars(cmd, scenario_vars))
+    if bad_vars:
+        allowed_str = ", ".join(f"${{{v}}}" for v in sorted(SCENARIO_PLACEHOLDER_VARS_GLOBAL | scenario_vars))
+        bad_str = ", ".join(f"${{{v}}}" for v in sorted(bad_vars))
+        errors.append(f"미허용 변수: {bad_str} — 허용: {allowed_str}")
+
+    try:
+        from arch_analysis import VERIFICATION_STEP_TYPES
+        valid_types = {s["type"] for s in VERIFICATION_STEP_TYPES}
+        for step in v_steps:
+            st = step.get("type", "") if isinstance(step, dict) else ""
+            if st and st not in valid_types:
+                warnings.append(f"미등록 verification type: {st}")
+    except ImportError:
+        pass
+
+    trigger_cmd = trigger.get("command", "") if isinstance(trigger, dict) else ""
+    created = _extract_created_resources(trigger_cmd)
+    referenced = _extract_referenced_resources(v_steps)
+    if created and referenced:
+        # Resolve variables in both sets for comparison
+        var_map = scenario.get("variables", {})
+        def _resolve_name(name):
+            m = re.match(r'^\$\{([A-Z_][A-Z0-9_]*)\}$', name)
+            if m and m.group(1) in var_map:
+                return str(var_map[m.group(1)])
+            return name
+        created_resolved = {_resolve_name(n) for n in created}
+        referenced_resolved = {_resolve_name(n) for n in referenced}
+        orphaned = referenced_resolved - created_resolved
+        # Exclude references to existing architecture services (not newly created)
+        arch_services = set()
+        arch = scenario.get("architecture", {})
+        if isinstance(arch, dict):
+            for svc in arch.get("services", []):
+                if isinstance(svc, dict):
+                    arch_services.add(svc.get("name", ""))
+                    arch_services.add(svc.get("service", ""))
+        orphaned -= arch_services
+        # Also exclude kubectl_check with expected="Running" (checking existing deployments)
+        existing_checks = set()
+        for step in v_steps:
+            if isinstance(step, dict) and step.get("type") == "kubectl_check":
+                if step.get("expected") == "Running":
+                    res_name = step.get("resource", "").split("/")[-1] if step.get("resource") else ""
+                    if res_name:
+                        existing_checks.add(res_name)
+        orphaned -= existing_checks
+        kubectl_types = {s.get("type") for s in v_steps if isinstance(s, dict)} & {"kubectl_check"}
+        if orphaned and kubectl_types:
+            errors.append(
+                f"verification이 trigger에서 생성하지 않는 리소스 참조: {', '.join(sorted(orphaned))} "
+                f"(trigger 생성: {', '.join(sorted(created_resolved))}) — 변수 사용으로 일치시킬 것"
+            )
+
+    allowed_dims = {"Service", "Operation", "Environment", "Namespace", "ClusterName"}
+    for step in v_steps:
+        if isinstance(step, dict) and step.get("type") == "metric_check":
+            for dim in step.get("dimensions", []):
+                if isinstance(dim, dict) and dim.get("Name") not in allowed_dims:
+                    errors.append(f"metric_check에 변동성 dimension 사용 금지: {dim['Name']}={dim.get('Value','')} — 허용: {', '.join(sorted(allowed_dims))}")
+
+    rubric = scenario.get("evaluation_rubric")
+    if isinstance(rubric, dict) and rubric.get("criteria"):
+        # Legacy dict format: {criteria: [...]}
+        total = sum(c.get("weight", 0) for c in rubric["criteria"] if isinstance(c, dict))
+        if total != 100:
+            errors.append(f"evaluation_rubric weight 합계 = {total} (100이어야 함)")
+    elif isinstance(rubric, list):
+        # v2 format: [{criterion, weight, how_to_verify}]
+        total = sum(c.get("weight", 0) for c in rubric if isinstance(c, dict))
+        if total != 100:
+            errors.append(f"evaluation_rubric weight 합계 = {total} (100이어야 함)")
+
+    # Phase 모델 검증 (v2)
+    _PHASE_ORDER = ["trigger_active", "effect_observed", "reaction_confirmed"]
+    _PHASE_ALLOWED_TYPES = {
+        "trigger_active": {"kubectl_check", "fis_experiment", "pod_status"},
+        "effect_observed": {"alarm_state", "metric_check", "log_pattern", "xray_trace", "xray_latency", "cw_alarm"},
+        "reaction_confirmed": {"investigation_event", "agent_investigation", "slack_message"},
+    }
+    last_phase_idx = -1
+    for step in v_steps:
+        if not isinstance(step, dict):
+            continue
+        phase = step.get("phase")
+        if not phase:
+            warnings.append(f"step '{step.get('name', '?')}'에 phase 필드 누락")
+            continue
+        if phase not in _PHASE_ORDER:
+            errors.append(f"유효하지 않은 phase '{phase}' — 허용: {_PHASE_ORDER}")
+            continue
+        phase_idx = _PHASE_ORDER.index(phase)
+        if phase_idx < last_phase_idx:
+            errors.append(f"phase 순서 역전: '{step.get('name', '?')}'({phase})가 이전 phase보다 앞에 위치")
+        last_phase_idx = phase_idx
+        step_type = step.get("type", "")
+        allowed = _PHASE_ALLOWED_TYPES.get(phase, set())
+        if step_type and allowed and step_type not in allowed:
+            warnings.append(f"step '{step.get('name', '?')}': type '{step_type}'은 phase '{phase}'에 비표준")
+
+    # reactive 시나리오 investigation 필수 검증
+    trigger_mode = scenario.get("trigger_mode", "")
+    has_alarm_step = any(
+        isinstance(s, dict) and s.get("type") in ("alarm_state", "cw_alarm") and s.get("expected") == "ALARM"
+        for s in v_steps
+    )
+    has_investigation = any(
+        isinstance(s, dict) and s.get("type") in ("investigation_event", "agent_investigation")
+        for s in v_steps
+    )
+    if trigger_mode == "reactive" and has_alarm_step and not has_investigation:
+        warnings.append("reactive 시나리오에 investigation step 누락 — alarm(ALARM) 포함 시 investigation_event 필수")
+
+    # restore 필수 검증
+    if not scenario.get("restore"):
+        warnings.append("restore 누락 — 장애 주입 후 원상복구 명령 필수")
+
+    # alarm_spec 유효성 검증 + trigger↔alarm 인과 관계 heuristic
+    _REQUIRED_ALARM_SPEC = ["metric_name", "namespace", "statistic", "comparison", "threshold", "period"]
+    _TRIGGER_METRIC_MAP = {
+        "abuser": ["Error"], "error": ["Error"], "corrupt": ["Error"],
+        "5xx": ["Fault"], "fault": ["Fault"],
+        "latency": ["Latency"], "delay": ["Latency"], "inject-latency": ["Latency"],
+        "stress": ["cpu_utilization", "node_cpu"], "oom": ["memory", "oom"],
+    }
+    for step in v_steps:
+        if not isinstance(step, dict):
+            continue
+        if step.get("type") not in ("alarm_state", "cw_alarm"):
+            continue
+        alarm_spec = step.get("alarm_spec")
+        alarm_name = step.get("alarm_name") or step.get("alarm")
+        if alarm_spec:
+            if not isinstance(alarm_spec, dict):
+                errors.append("alarm_spec은 dict여야 합니다")
+            else:
+                missing_spec = [f for f in _REQUIRED_ALARM_SPEC if f not in alarm_spec]
+                if missing_spec:
+                    errors.append(f"alarm_spec 필수 필드 누락: {', '.join(missing_spec)}")
+        elif not alarm_name:
+            errors.append(f"alarm_state 스텝 '{step.get('name', '?')}'에 alarm_name 또는 alarm_spec 필수")
+        # trigger↔alarm 인과 관계 heuristic warning
+        if trigger_cmd:
+            trigger_lower = trigger_cmd.lower()
+            inferred_metrics = set()
+            for kw, metrics in _TRIGGER_METRIC_MAP.items():
+                if kw in trigger_lower:
+                    inferred_metrics.update(m.lower() for m in metrics)
+            if inferred_metrics:
+                alarm_metric_hint = ""
+                if alarm_spec and isinstance(alarm_spec, dict):
+                    alarm_metric_hint = alarm_spec.get("metric_name", "").lower()
+                elif alarm_name:
+                    alarm_metric_hint = alarm_name.lower()
+                if alarm_metric_hint:
+                    match_found = any(m in alarm_metric_hint for m in inferred_metrics)
+                    if not match_found:
+                        warnings.append(
+                            f"trigger↔alarm 불일치 가능: trigger에서 {inferred_metrics} 유발 추정, "
+                            f"but alarm '{alarm_name or alarm_spec.get('metric_name', '?')}' 참조"
+                        )
+
+    return errors, warnings
+
+
+@scenario_bp.route("/api/validate-scenario", methods=["POST"])
+def api_validate_scenario():
+    """Validate scenario JSON without saving. Returns errors and warnings."""
+    body = request.json or {}
+    scenario = body.get("scenario")
+    if not scenario or not isinstance(scenario, dict):
+        return jsonify({"ok": False, "errors": ["scenario object required"], "warnings": []}), 400
+    scenario["_space_id"] = body.get("space_id", "") or _req_space_id("json")
+    fixes = _fix_scenario(scenario)
+    scenario.pop("_space_id", None)
+    errors, warnings = _validate_scenario(scenario)
+    return jsonify({"ok": len(errors) == 0, "errors": errors, "warnings": warnings, "fixes": fixes})
+
+
+@scenario_bp.route("/api/arch/save-scenario", methods=["POST"])
+def api_arch_save_scenario():
+    """Save a generated scenario JSON to DynamoDB, scoped by space_id."""
+    body = request.json or {}
+    scenario = body.get("scenario")
+    if not scenario or not isinstance(scenario, dict):
+        return jsonify({"ok": False, "error": "scenario object required"}), 400
+
+    sid = scenario.get("id", "").strip()
+    if not sid:
+        return jsonify({"ok": False, "error": "scenario.id required"}), 400
+    if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_\-]{2,80}$', sid):
+        return jsonify({"ok": False, "error": "invalid scenario ID: 영문/숫자/하이픈만 허용 (3~81자)"}), 400
+
+    space_id = _req_space_id("json")
+
+    # Multi Agent 모듈: 검증/fix 없이 저장 (Agent가 이미 환경 확인 완료)
+    executor = scenario.get("executor", "")
+    if executor == "multi_agent":
+        if _get_scenario(space_id, sid):
+            return jsonify({"ok": False, "error": f"Scenario '{sid}' already exists"}), 409
+        _save_scenario(space_id, scenario)
+        return jsonify({"ok": True, "id": sid, "space_id": space_id})
+
+    # Rule Engine 모듈: 기존 검증 + auto-fix
+    scenario["_space_id"] = space_id
+    fixes = _fix_scenario(scenario)
+    scenario.pop("_space_id", None)
+    errors, warnings = _validate_scenario(scenario)
+    if errors:
+        return jsonify({"ok": False, "error": "시나리오 검증 실패", "validation_errors": errors, "warnings": warnings}), 400
+
+    if _get_scenario(space_id, sid):
+        return jsonify({"ok": False, "error": f"Scenario '{sid}' already exists"}), 409
+
+    _save_scenario(space_id, scenario)
+    result = {"ok": True, "id": sid, "space_id": space_id}
+    if fixes:
+        result["fixes"] = fixes
+        print(f"[save-scenario] auto-fix: {fixes}")
+    if warnings:
+        result["warnings"] = warnings
+    return jsonify(result)
+
+
+# ===================================================================
+# Scenario Tab — List, Detail, Run Proxy, Chat
+# ===================================================================
+
+SCENARIO_CATEGORY_META = {
+    "infrastructure": {"label": "Infrastructure", "color": "#f97316", "order": 0},
+    "application":    {"label": "Application",    "color": "#ef4444", "order": 1},
+    "composite":      {"label": "Composite",      "color": "#06b6d4", "order": 2},
+    "multi-service":  {"label": "Multi Service",  "color": "#a855f7", "order": 3},
+    "single-service": {"label": "Single Service", "color": "#ef4444", "order": 4},
+    "kubernetes":     {"label": "Kubernetes",      "color": "#3b82f6", "order": 5},
+    "aws":            {"label": "AWS Infrastructure", "color": "#f97316", "order": 6},
+    "cleanup":        {"label": "Cleanup / Restore",  "color": "#64748b", "order": 7},
+    "data":           {"label": "Data Layer",          "color": "#10b981", "order": 8},
+    "observability":  {"label": "Observability",       "color": "#8b5cf6", "order": 9},
+    "security":       {"label": "Security",            "color": "#dc2626", "order": 10},
+}
+
+
+@scenario_bp.route("/api/scenarios")
+def api_scenario_list():
+    space_id = _req_space_id()
+    filter_space = request.args.get("filter_space_id", "")
+    effective_space = filter_space.strip() if filter_space.strip() else space_id
+
+    scenarios = _list_scenarios(effective_space)
+
+    # Space에 속한 앱 목록 (보안 시나리오 필터용)
+    space_apps = _get_space_app_names(effective_space)
+
+    try:
+        from security_scenarios import scenario_engine as _sec_engine
+        for sec in _sec_engine.list_registered_scenarios():
+            sec_space = sec.get("devops_space_id", "")
+            sec_app = sec.get("app_name", sec.get("target_service", ""))
+            if sec_space and sec_space != effective_space:
+                continue
+            if not sec_space:
+                if space_apps and sec_app and not _app_matches_space(sec_app, space_apps):
+                    continue
+            cat = sec.get("category", "security")
+            if cat == "security" and sec.get("target_service"):
+                cat = f"security-{sec['target_service']}"
+            scenarios.append({
+                "id": sec.get("id", ""),
+                "name": sec.get("name", ""),
+                "description": sec.get("description", ""),
+                "category": cat,
+                "app_name": sec_app,
+                "layer": sec.get("layer", "app"),
+                "target_service": sec.get("target_service", ""),
+                "failure_mode": sec.get("failure_mode", ""),
+                "purpose": sec.get("purpose", ""),
+                "expected_root_cause": sec.get("expected_root_cause", ""),
+                "verification_count": len(sec.get("verification", {}).get("steps", [])),
+                "source": "security-agent",
+                "risk_level": sec.get("risk_level", ""),
+                "finding_id": sec.get("finding_id", ""),
+                "last_result": sec.get("last_result"),
+            })
+    except Exception:
+        pass
+
+    # security-{app} 카테고리 동적 생성
+    categories = dict(SCENARIO_CATEGORY_META)
+    for s in scenarios:
+        cat = s.get("category", "")
+        if cat.startswith("security-") and cat not in categories:
+            app = cat.replace("security-", "", 1)
+            categories[cat] = {"label": f"Security — {app}", "color": "#dc2626", "order": 10}
+
+    return jsonify({"ok": True, "scenarios": scenarios, "categories": categories,
+                    "space_id": effective_space})
+
+
+@scenario_bp.route("/api/scenarios/<scenario_id>")
+def api_scenario_detail(scenario_id):
+    space_id = _req_space_id()
+    scenario = _get_scenario(space_id, scenario_id)
+    if not scenario and scenario_id.startswith("SEC-"):
+        try:
+            from security_scenarios import scenario_engine as _sec_engine
+            for sec in _sec_engine.list_registered_scenarios():
+                if sec.get("id") == scenario_id:
+                    if space_id and sec.get("devops_space_id") and sec["devops_space_id"] != space_id:
+                        continue
+                    scenario = sec
+                    break
+        except Exception:
+            pass
+    if not scenario:
+        return jsonify({"ok": False, "error": "Scenario not found"}), 404
+    return jsonify({"ok": True, "scenario": scenario})
+
+
+@scenario_bp.route("/api/scenarios/<scenario_id>", methods=["DELETE"])
+def api_scenario_delete(scenario_id):
+    space_id = _req_space_id()
+    if _delete_scenario(space_id, scenario_id):
+        return jsonify({"ok": True, "id": scenario_id})
+    return jsonify({"ok": False, "error": "Scenario not found"}), 404
+
+
+# ---------------------------------------------------------------------------
+# Scenario loading helpers (shared with verifier)
+# ---------------------------------------------------------------------------
+def _scenario_placeholder_values():
+    """Build placeholder->value map for global variables."""
+    _account_id = _cfg_get(_CFG, "aws.account_id", os.environ.get("AWS_ACCOUNT_ID", ""))
+    _project_name = _cfg_get(_CFG, "project.name", os.environ.get("PROJECT_NAME", ""))
+    _namespace = _cfg_get(_CFG, "kubernetes.namespace", os.environ.get("K8S_NAMESPACE", ""))
+    return {
+        "${PROJECT_NAME}": _project_name,
+        "${AWS_REGION}": AWS_REGION,
+        "${ECR_REGISTRY}": os.environ.get("ECR_REGISTRY", f"{_account_id}.dkr.ecr.{AWS_REGION}.amazonaws.com"),
+        "${AWS_ACCOUNT_ID}": _account_id,
+        "${NAMESPACE}": _namespace,
+    }
+
+
+def _ensure_evaluation_rubric(scenario):
+    """evaluation_rubric이 없으면 verification steps 기반으로 자동 생성."""
+    rubric = scenario.get("evaluation_rubric")
+    if isinstance(rubric, dict) and rubric.get("criteria"):
+        return
+    if isinstance(rubric, list) and rubric:
+        return
+
+    steps = scenario.get("verification", {}).get("steps", [])
+    criteria = []
+    detection_steps = [s for s in steps if s.get("type") in ("alarm_state", "cw_alarm", "metric_check")]
+    analysis_steps = [s for s in steps if s.get("type") in ("agent_investigation", "investigation_event")]
+    observation_steps = [s for s in steps if s not in detection_steps and s not in analysis_steps]
+
+    if detection_steps:
+        w = 40 // len(detection_steps)
+        for s in detection_steps:
+            criteria.append({"name": s.get("name", "장애 감지"), "weight": w, "type": "detection"})
+    if analysis_steps:
+        w = 30 // len(analysis_steps)
+        for s in analysis_steps:
+            criteria.append({"name": s.get("name", "Agent 조사"), "weight": w, "type": "analysis"})
+    if observation_steps:
+        w = 30 // len(observation_steps)
+        for s in observation_steps:
+            criteria.append({"name": s.get("name", "상태 관찰"), "weight": w, "type": "observation"})
+
+    if not criteria:
+        criteria = [
+            {"name": "근본 원인 식별", "weight": 40, "type": "detection"},
+            {"name": "영향 분석", "weight": 30, "type": "analysis"},
+            {"name": "타임라인 재구성", "weight": 30, "type": "observation"},
+        ]
+
+    total = sum(c["weight"] for c in criteria)
+    if criteria and total != 100:
+        criteria[-1]["weight"] += (100 - total)
+
+    scenario["evaluation_rubric"] = {"criteria": criteria, "passing_score": 6}
+
+
+def _load_scenario_by_id(scenario_id, space_id=None):
+    """Load a scenario from DynamoDB with placeholder substitution."""
+    space_id = space_id or AGENT_SPACE_ID
+    sc = _get_scenario(space_id, scenario_id)
+    if not sc:
+        return None
+    subs = _scenario_placeholder_values()
+    raw = json.dumps(sc, ensure_ascii=False)
+    for placeholder, value in subs.items():
+        raw = raw.replace(placeholder, value)
+    return json.loads(raw)
+
+
+def _resolve_namespace(scenario, space_id):
+    """Determine namespace: scenario-level > arch analysis > config.yaml > default."""
+    ns = scenario.get("namespace")
+    if ns:
+        return ns
+    try:
+        arch = _load_latest_arch(space_id)
+        if arch and arch.get("graph", {}).get("namespace"):
+            return arch["graph"]["namespace"]
+    except Exception:
+        pass
+    return _cfg_get(_CFG, "kubernetes.namespace", "default")
+
+
+# ---------------------------------------------------------------------------
+# Executor config API
+# ---------------------------------------------------------------------------
+@scenario_bp.route("/api/executor/config")
+def api_executor_config():
+    """현재 executor 설정 반환."""
+    return jsonify({
+        "ok": True,
+        "default": _cfg_get(_CFG, "executor.default", "classic"),
+        "force": _cfg_get(_CFG, "executor.force", False),
+        "options": ["classic", "multi_agent"],
+    })
+
+
+@scenario_bp.route("/api/executor/config", methods=["PUT"])
+def api_executor_config_update():
+    """executor.default 변경 (런타임 — config.yaml 수정)."""
+    import yaml
+    body = request.json or {}
+    new_default = body.get("default", "")
+    if new_default not in ("classic", "multi_agent", "agent"):
+        return jsonify({"ok": False, "error": f"invalid executor: {new_default}"}), 400
+
+    config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+    try:
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+        cfg.setdefault("executor", {})["default"] = new_default
+        with open(config_path, "w") as f:
+            yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
+        _CFG["executor"] = cfg["executor"]
+        return jsonify({"ok": True, "default": new_default})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Simulation routes (direct verifier integration, no proxy)
+# ---------------------------------------------------------------------------
+@scenario_bp.route("/api/active-runs")
+def api_active_runs():
+    """현재 in-memory에 활성화된 실행 목록."""
+    from verifier import list_active_runs
+    runs = list_active_runs()
+    return jsonify({"ok": True, "runs": runs})
+
+
+@scenario_bp.route("/api/scenario-run/<scenario_id>", methods=["POST"])
+def api_scenario_run(scenario_id):
+    from verifier import start_run, ScriptExecutor, PythonScriptExecutor
+    try:
+        space_id = _req_space_id()
+        scenario = _load_scenario_by_id(scenario_id, space_id=space_id)
+        if not scenario:
+            return jsonify({"ok": False, "error": "not found"}), 404
+
+        resume_from = int(request.args.get("resume_from", 0))
+
+        script, script_type = _get_scenario_script(scenario_id)
+        namespace = _resolve_namespace(scenario, space_id)
+
+        if script and script_type == "python":
+            run = PythonScriptExecutor(scenario, script, agent_space_id=_agent_space_id(),
+                                       namespace=namespace, resume_from=resume_from)
+            import threading as _thr
+            from verifier import _active_runs, _runs_lock
+            with _runs_lock:
+                _active_runs[run.run_id] = run
+            _thr.Thread(target=run._run_pipeline, daemon=True).start()
+        elif script:
+            run = ScriptExecutor(scenario, script, agent_space_id=_agent_space_id(),
+                                 namespace=namespace, resume_from=resume_from)
+            import threading as _thr
+            from verifier import _active_runs, _runs_lock
+            with _runs_lock:
+                _active_runs[run.run_id] = run
+            _thr.Thread(target=run._run_pipeline, daemon=True).start()
+        else:
+            run = start_run(scenario, namespace=namespace, agent_space_id=_agent_space_id())
+
+        return jsonify({"ok": True, "run_id": run.run_id, "status": run.status})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/status")
+def api_scenario_run_status(run_id):
+    from verifier import get_active_run
+    run = get_active_run(run_id)
+    if run:
+        return jsonify(run.to_dict())
+    try:
+        table = _boto_session().resource("dynamodb").Table(RUNS_TABLE)
+        resp = table.get_item(Key={"run_id": run_id, "record_type": "run"})
+        item = resp.get("Item")
+        if item:
+            item = _backfill_investigation(item, table)
+            return jsonify(json.loads(json.dumps(item, default=str)))
+    except Exception:
+        pass
+    return jsonify({"error": "Run not found"}), 404
+
+
+def _backfill_investigation(item, table):
+    """investigation_task_id backfill + 조사 종료 step 상태 보정."""
+    iid = item.get("incident_id", "")
+    if not iid:
+        return item
+    tid = item.get("investigation_task_id")
+    space_id = item.get("agent_space_id") or item.get("space_id", "")
+    try:
+        from verifier_utils import _find_task_by_incident_id
+        if not tid:
+            task_id, status = _find_task_by_incident_id(iid, space_id=space_id)
+            if task_id:
+                item["investigation_task_id"] = task_id
+                tid = task_id
+                table.update_item(
+                    Key={"run_id": item["run_id"], "record_type": "run"},
+                    UpdateExpression="SET investigation_task_id = :tid",
+                    ExpressionAttributeValues={":tid": task_id},
+                )
+        else:
+            status = None
+        # 조사 종료 step이 아직 미완료면 API로 상태 확인 후 보정
+        steps = item.get("steps", [])
+        need_fix = any(
+            "조사 종료" in s.get("name", "") and s.get("status") in ("checking", "pending", "warn")
+            for s in steps
+        )
+        if need_fix and tid:
+            if status is None:
+                _, status = _find_task_by_incident_id(iid, space_id=space_id)
+            step_updated = False
+            for s in steps:
+                if "조사 종료" in s.get("name", "") and s.get("status") in ("checking", "pending", "warn"):
+                    s["status"] = "pass" if status in ("COMPLETED", "completed", "done", "LINKED", "linked") else "checking"
+                    s["detail"] = f"task: {tid[:20]}" if s["status"] == "pass" else f"진행 중 ({status})"
+                    step_updated = True
+            if step_updated:
+                table.update_item(
+                    Key={"run_id": item["run_id"], "record_type": "run"},
+                    UpdateExpression="SET steps = :s",
+                    ExpressionAttributeValues={":s": steps},
+                )
+    except Exception:
+        pass
+    return item
+
+
+@scenario_bp.route("/api/scenario-runs/<scenario_id>")
+def api_scenario_runs(scenario_id):
+    """시나리오의 실행 이력 목록 (최신순, 최대 20개)."""
+    try:
+        from boto3.dynamodb.conditions import Attr
+        table = _boto_session().resource("dynamodb").Table(RUNS_TABLE)
+        resp = table.scan(
+            FilterExpression=Attr("record_type").eq("run") & Attr("scenario_id").eq(scenario_id),
+            ProjectionExpression="run_id, scenario_id, #s, #r, investigation_task_id, started_at, completed_at, elapsed",
+            ExpressionAttributeNames={"#s": "status", "#r": "result"},
+        )
+        items = resp.get("Items", [])
+        items.sort(key=lambda x: x.get("started_at", ""), reverse=True)
+        runs = json.loads(json.dumps(items[:20], default=str))
+        return jsonify({"ok": True, "runs": runs})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/resume", methods=["POST"])
+def api_scenario_run_resume(run_id):
+    """Resume a saved run from the first fail/pending step."""
+    from verifier import resume_run, get_active_run, ScriptExecutor, PythonScriptExecutor
+    from verifier import _active_runs, _runs_lock
+    if get_active_run(run_id):
+        return jsonify({"ok": False, "error": "Run already active"}), 409
+    try:
+        table = _boto_session().resource("dynamodb").Table(RUNS_TABLE)
+        resp = table.get_item(Key={"run_id": run_id, "record_type": "run"})
+        item = resp.get("Item")
+        if not item:
+            return jsonify({"ok": False, "error": "Run not found in history"}), 404
+
+        scenario_id = item.get("scenario_id", "")
+        space_id = item.get("agent_space_id") or _req_space_id()
+        scenario = _load_scenario_by_id(scenario_id, space_id=space_id)
+        if not scenario:
+            return jsonify({"ok": False, "error": f"Scenario '{scenario_id}' not found"}), 404
+
+        saved_data = json.loads(json.dumps(item, default=str))
+        script_type = saved_data.get("script_type", "")
+        resume_from = _find_resume_index(saved_data)
+
+        if script_type == "python":
+            script, _ = _get_scenario_script(scenario_id)
+            if not script:
+                return jsonify({"ok": False, "error": "steps.py not found for scenario"}), 404
+            namespace = _resolve_namespace(scenario, space_id)
+            run = PythonScriptExecutor(scenario, script, agent_space_id=_agent_space_id(),
+                                       namespace=namespace, resume_from=resume_from)
+            run._incident_id = saved_data.get("incident_id", "") or None
+            run._investigation_task_id = saved_data.get("investigation_task_id") or None
+            with _runs_lock:
+                _active_runs[run.run_id] = run
+            import threading as _thr
+            _thr.Thread(target=run._run_pipeline, daemon=True).start()
+        elif script_type == "bash":
+            script, _ = _get_scenario_script(scenario_id)
+            if not script:
+                return jsonify({"ok": False, "error": "run.sh not found for scenario"}), 404
+            namespace = _resolve_namespace(scenario, space_id)
+            run = ScriptExecutor(scenario, script, agent_space_id=_agent_space_id(),
+                                 namespace=namespace, resume_from=resume_from)
+            run._incident_id = saved_data.get("incident_id", "") or None
+            run._investigation_task_id = saved_data.get("investigation_task_id") or None
+            with _runs_lock:
+                _active_runs[run.run_id] = run
+            import threading as _thr
+            _thr.Thread(target=run._run_pipeline, daemon=True).start()
+        else:
+            run = resume_run(saved_data, scenario)
+
+        return jsonify({"ok": True, "run_id": run.run_id, "status": run.status,
+                        "resume_from": resume_from})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def _find_resume_index(saved_data):
+    """Find first fail/pending step index from saved run data."""
+    steps = saved_data.get("steps", [])
+    for i, s in enumerate(steps):
+        if s.get("status") in ("fail", "pending", "checking"):
+            return i
+    return 0
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/cancel", methods=["POST"])
+def api_scenario_run_cancel(run_id):
+    from verifier import cancel_run
+    if cancel_run(run_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "Run not found or already completed"}), 404
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/retry/<int:step_index>", methods=["POST"])
+def api_scenario_run_retry(run_id, step_index):
+    from verifier import retry_from_step
+    result = retry_from_step(run_id, step_index)
+    if not result:
+        return jsonify({"error": "Run not found or invalid step index"}), 404
+    if isinstance(result, dict) and result.get("action") == "new_run":
+        return jsonify({
+            "success": True,
+            "action": "new_run",
+            "scenario_id": result["scenario_id"],
+            "resume_from": result["resume_from"],
+        })
+    return jsonify({"success": True, "run_id": result.run_id, "status": result.status})
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/correct", methods=["POST"])
+def api_scenario_run_correct(run_id):
+    """실패한 스텝의 error_category에 따라 교정 액션 수행.
+
+    Body: {"space_id": "...", "session_id": "...(optional)"}
+    - timeout: 기계적 재시도 (timeout 연장)
+    - command_error / config_error: Agent에게 교정 요청
+    - transient: 단순 재시도
+    - infra_missing: blocked 반환
+    """
+    from verifier import get_active_run, VERIFIERS, _run_cmd, _classify_step_error
+    run = get_active_run(run_id)
+    if not run:
+        return jsonify({"ok": False, "error": "Run not found or completed"}), 404
+    if run.status != "completed":
+        return jsonify({"ok": False, "error": f"Run still {run.status}"}), 409
+
+    body = request.json or {}
+    space_id = body.get("space_id", "").strip() or _req_space_id()
+    session_id = body.get("session_id", "")
+
+    failed_steps = [s for s in run.steps if s["status"] == "fail"]
+    if not failed_steps:
+        return jsonify({"ok": True, "message": "실패한 스텝 없음", "actions": []})
+
+    actions = []
+    agent_correction_needed = []
+
+    for step in failed_steps:
+        cat = step.get("error_category", "command_error")
+        step_info = {"name": step["name"], "type": step["type"],
+                     "detail": step["detail"], "category": cat}
+
+        if cat == "infra_missing":
+            actions.append({**step_info, "action": "blocked",
+                            "message": "인프라 부재 — 수동 조치 필요"})
+        elif cat == "transient":
+            verifier_fn = VERIFIERS.get(step["type"])
+            if verifier_fn:
+                cfg = dict(step["config"])
+                cfg["_namespace"] = run.namespace
+                cfg["_scenario_profile"] = run._scenario_profile
+                ok, detail = verifier_fn(cfg)
+                step["status"] = "pass" if ok else "fail"
+                step["detail"] = detail
+                if ok:
+                    actions.append({**step_info, "action": "retry_success", "detail": detail})
+                else:
+                    cat2, reason2 = _classify_step_error(step["type"], detail)
+                    step["error_category"] = cat2
+                    actions.append({**step_info, "action": "retry_failed",
+                                    "escalated_to": cat2, "detail": detail})
+                    if cat2 in ("command_error", "config_error"):
+                        agent_correction_needed.append(step)
+            else:
+                actions.append({**step_info, "action": "no_verifier"})
+        elif cat == "timeout":
+            actions.append({**step_info, "action": "timeout_noted",
+                            "message": "timeout — traffic boost + reinject 후 재실행 필요"})
+        elif cat in ("command_error", "config_error"):
+            agent_correction_needed.append(step)
+
+    # Agent 교정이 필요한 스텝들을 모아서 한번에 요청
+    correction_result = None
+    if agent_correction_needed:
+        lines = ["시나리오 실행 중 다음 검증 스텝이 실패했습니다. 시나리오 JSON의 해당 스텝을 수정해주세요.\n"]
+        for s in agent_correction_needed:
+            cat = s.get("error_category", "command_error")
+            lines.append(f"### 스텝: {s['name']} (type={s['type']}, category={cat})")
+            lines.append(f"- 에러: {s['detail']}")
+            cmd = s.get("config", {}).get("command", "")
+            if cmd:
+                lines.append(f"- 명령: `{cmd}`")
+            expected = s.get("config", {}).get("expected", "")
+            if expected:
+                lines.append(f"- 기대값: {expected}")
+            lines.append("")
+
+        lines.append("수정된 시나리오 JSON을 ```json 블록으로 반환해주세요.")
+        correction_prompt = "\n".join(lines)
+
+        try:
+            from ai_provider import get_provider
+            resp = get_provider().send_raw(
+                space_id=space_id,
+                session_id=session_id or "",
+                prompt=correction_prompt,
+            )
+            correction_reply = resp["reply"]
+            corrected_scenario = _extract_json_block(correction_reply)
+
+            correction_result = {
+                "reply": correction_reply,
+                "has_corrected_json": bool(corrected_scenario),
+                "session_id": resp.get("session_id", session_id),
+            }
+            if corrected_scenario:
+                correction_result["corrected_scenario"] = corrected_scenario
+
+            for s in agent_correction_needed:
+                actions.append({
+                    "name": s["name"], "type": s["type"],
+                    "detail": s["detail"], "category": s.get("error_category"),
+                    "action": "agent_correction_requested",
+                })
+        except Exception as e:
+            correction_result = {"error": str(e)}
+            for s in agent_correction_needed:
+                actions.append({
+                    "name": s["name"], "type": s["type"],
+                    "detail": s["detail"], "category": s.get("error_category"),
+                    "action": "agent_correction_failed", "error": str(e),
+                })
+
+    return jsonify({
+        "ok": True,
+        "run_id": run_id,
+        "actions": actions,
+        "correction": correction_result,
+    })
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/exec-cmd", methods=["POST"])
+def api_scenario_run_exec_cmd(run_id):
+    """사용자가 직접 명령어를 실행하고 결과를 확인."""
+    from verifier import _run_cmd
+    body = request.json or {}
+    cmd = body.get("command", "").strip()
+    if not cmd:
+        return jsonify({"ok": False, "error": "명령어 없음"}), 400
+    if any(dangerous in cmd for dangerous in ["rm -rf /", "mkfs", "> /dev/"]):
+        return jsonify({"ok": False, "error": "위험한 명령어 차단"}), 400
+    try:
+        import subprocess
+        proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+        return jsonify({
+            "ok": True,
+            "stdout": proc.stdout[-2000:] if proc.stdout else "",
+            "stderr": proc.stderr[-1000:] if proc.stderr else "",
+            "exit_code": proc.returncode,
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "error": "명령어 실행 timeout (30s)"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
+@scenario_bp.route("/api/scenario-run/<run_id>/restore", methods=["POST"])
+def api_scenario_run_restore(run_id):
+    from verifier import get_active_run, _run_cmd
+    run = get_active_run(run_id)
+    if not run:
+        return jsonify({"error": "Run not found"}), 404
+    restore_cmd = run.scenario.get("restore", {}).get("command", "")
+    if not restore_cmd:
+        return jsonify({"success": True, "message": "복원 명령 없음"})
+    import cluster_manager
+    restore_cmd = cluster_manager.inject_context(restore_cmd)
+    ok, stdout, stderr = _run_cmd(restore_cmd, timeout=60)
+    return jsonify({"success": ok, "output": stdout, "error": stderr})
+
+
+@scenario_bp.route("/api/evaluate/<run_id>", methods=["POST"])
+def api_evaluate(run_id):
+    from evaluator import evaluate_investigation
+    data = request.get_json() or {}
+    task_id = data.get("task_id")
+    scenario_id = data.get("scenario_id")
+
+    if not task_id:
+        try:
+            tbl = _boto_session().resource("dynamodb").Table(RUNS_TABLE)
+            resp = tbl.get_item(Key={"run_id": run_id, "record_type": "run"})
+            item = resp.get("Item", {})
+            task_id = item.get("investigation_task_id")
+            scenario_id = scenario_id or item.get("scenario_id")
+        except Exception:
+            pass
+
+    if not task_id:
+        return jsonify({"error": "task_id not found"}), 400
+
+    ui_space_id = data.get("space_id", "").strip() or _req_space_id()
+    agent_sid = _agent_space_id()
+    scenario = _load_scenario_by_id(scenario_id, space_id=ui_space_id) if scenario_id else None
+    if not scenario or not scenario.get("evaluation_rubric"):
+        return jsonify({"error": f"시나리오 {scenario_id}에 evaluation_rubric 없음 (space: {ui_space_id})"}), 400
+
+    try:
+        session = _boto_session()
+        client = session.client("devops-agent")
+        exec_resp = client.list_executions(agentSpaceId=agent_sid, taskId=task_id, limit=10)
+        messages = []
+        for exe in exec_resp.get("executions", []):
+            jr = client.list_journal_records(
+                agentSpaceId=agent_sid, executionId=exe["executionId"],
+                limit=100, order="ASC",
+            )
+            for r in jr.get("records", []):
+                content = r.get("content", {})
+                raw_text = content.get("text", "") if isinstance(content, dict) else str(content)
+                messages.append({
+                    "text": raw_text,
+                    "time": str(r.get("createdAt", ""))[:19],
+                    "record_type": r.get("recordType", ""),
+                })
+    except Exception as e:
+        return jsonify({"error": f"journal 조회 실패: {e}"}), 500
+
+    if not messages:
+        return jsonify({"error": "조사 메시지 없음"}), 400
+
+    result = evaluate_investigation(messages, scenario)
+
+    try:
+        from decimal import Decimal
+        tbl = _boto_session().resource("dynamodb").Table(RUNS_TABLE)
+        eval_item = json.loads(json.dumps(result), parse_float=Decimal)
+        tbl.put_item(Item={
+            "run_id": run_id, "record_type": "evaluation",
+            "scenario_id": scenario_id, "task_id": task_id,
+            **eval_item,
+        })
+    except Exception as e:
+        result["save_error"] = str(e)
+
+    return jsonify(result)
+
+
+@scenario_bp.route("/api/evaluate/<run_id>")
+def api_get_evaluation(run_id):
+    try:
+        tbl = _boto_session().resource("dynamodb").Table(RUNS_TABLE)
+        resp = tbl.get_item(Key={"run_id": run_id, "record_type": "evaluation"})
+        item = resp.get("Item")
+        if not item:
+            return jsonify({"found": False}), 404
+        return jsonify(json.loads(json.dumps(item, default=str)))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@scenario_bp.route("/api/scenario-templates")
+def api_scenario_templates():
+    from arch_analysis import FAILURE_MODES
+    return jsonify({"ok": True, "templates": FAILURE_MODES})
+
+
+def _build_scenario_chat_context(space_id=None, template_id=None, app_name=None,
+                                  include_script=False) -> str:
+    """Skill 트리거 기반 경량 프롬프트 생성.
+
+    Agent Space에 등록된 scenario-generate 스킬이 포맷/규칙을 제공하므로,
+    앱은 동적 데이터(장애 모드, 앱 스코프, 알람, FIS, 기존 시나리오)만 전달.
+    """
+    from arch_analysis import FAILURE_MODES
+
+    if template_id:
+        selected = [fm for fm in FAILURE_MODES if fm["id"] == template_id]
+        if not selected:
+            selected = FAILURE_MODES
+        fm = selected[0]
+        trigger_tag = f"#scenario-generate {fm['id']}"
+        fm_section = (
+            f"## 장애 모드 정보\n"
+            f"- ID: {fm['id']}\n"
+            f"- 이름: {fm['name']}\n"
+            f"- 카테고리: infrastructure\n"
+            f"- 레이어: {fm.get('layer', '')}\n"
+            f"- 트리거 모드: {fm.get('trigger_mode', 'reactive')}\n"
+            f"- 설명: {fm['description']}\n"
+            f"- 트리거 메커니즘: {', '.join(fm.get('trigger_mechanism', []))}\n"
+            f"- 적용 조건: {fm.get('applicable_when', '')}"
+        )
+        obs = fm.get("observation_signals")
+        if obs:
+            fm_section += "\n\n## 관측 신호 (observation_signals) — verification steps 생성 기준\n"
+            fm_section += "아래 신호를 현재 환경(EKS/CloudWatch/etc)에 맞는 구체적 verification step으로 변환하세요.\n"
+            fm_section += "effect_type이 infra_state인 signal은 반드시 kubectl_check로 직접 확인. metric_observed는 확인 우선 원칙 적용.\n\n"
+            for phase, signals in obs.items():
+                fm_section += f"### {phase}\n"
+                for sig in signals:
+                    if isinstance(sig, dict):
+                        line = f"- [{sig['effect_type']}] {sig['signal']}: {sig['description']}"
+                        if sig.get("verification_hint"):
+                            line += f"\n  힌트: {sig['verification_hint']}"
+                        if sig.get("metric_hint"):
+                            mh = sig["metric_hint"]
+                            line += f"\n  metric_hint: {mh['namespace']}/{mh['metric_name']} ({mh.get('statistic','')}, {mh.get('direction','')})"
+                        if sig.get("fallback"):
+                            line += f"\n  fallback: {sig['fallback']}"
+                        fm_section += f"{line}\n"
+                    else:
+                        fm_section += f"- {sig}\n"
+    else:
+        trigger_tag = "#scenario-generate"
+        fm_section = (
+            "## 장애 모드\n"
+            "사용자 메시지에 따라 적절한 장애 모드를 선택하여 시나리오를 생성하세요.\n\n"
+            "### 가용 장애 모드\n" +
+            "\n".join(f"- {fm['id']}: {fm['name']} — {fm['description'][:60]}"
+                      for fm in FAILURE_MODES)
+        )
+
+    app_section = ""
+    topo_section = ""
+    cluster_name = _cfg_get(_CFG, "kubernetes.cluster_name", "devops-simulator")
+    namespace = _cfg_get(_CFG, "kubernetes.namespace", "dockercoins")
+    if app_name:
+        try:
+            saved = _load_latest_arch(space_id or AGENT_SPACE_ID)
+            if saved and saved.get("graph"):
+                nodes = saved["graph"].get("nodes", [])
+                edges = saved["graph"].get("edges", [])
+                svc_names = [n["name"] for n in nodes if (n.get("group") or "") == app_name]
+                if svc_names:
+                    app_section = (
+                        f"## 대상 앱: {app_name}\n"
+                        f"- 서비스: {', '.join(svc_names)}\n"
+                        f"- EKS 클러스터: {cluster_name}\n"
+                        f"- 네임스페이스: {namespace}"
+                    )
+                # 토폴로지 그래프 — 서비스 간 통신 경로 (architecture/flow 생성의 근거)
+                node_set = {n["name"] for n in nodes}
+                topo_lines = []
+                for e in edges:
+                    src, tgt = e.get("source", ""), e.get("target", "")
+                    if src in node_set and tgt in node_set:
+                        proto = e.get("protocol", "")
+                        port = e.get("port", "")
+                        label = f"{proto}:{port}" if proto and port else (proto or "")
+                        topo_lines.append(f"  {src} → {tgt}" + (f" ({label})" if label else ""))
+                if topo_lines:
+                    topo_section = (
+                        "## 아키텍처 토폴로지 (분석 결과)\n"
+                        "서비스 간 실제 통신 경로:\n" + "\n".join(topo_lines)
+                    )
+        except Exception:
+            pass
+    if not app_section:
+        app_section = (
+            f"## 대상 인프라\n"
+            f"- EKS 클러스터: {cluster_name}\n"
+            f"- 네임스페이스: {namespace}"
+        )
+
+    # 인프라 readiness probe — 검증된 리소스 테이블 생성
+    readiness_section = ""
+    try:
+        from readiness_probe import probe_scenario_readiness
+        probe_scenario = {}
+        if template_id:
+            # 템플릿 기반이면 알람 패턴으로 검색
+            probe_scenario = {"target_service": app_name or "", "verification": {"alarms": []}}
+        # 기본 알람 목록은 여전히 조회하되 readiness probe 결과로 보강
+        session = _boto_session()
+        cw = session.client("cloudwatch")
+        paginator = cw.get_paginator("describe_alarms")
+        alarms_raw = []
+        for page in paginator.paginate(MaxRecords=100):
+            for a in page.get("MetricAlarms", []):
+                alarms_raw.append(a)
+            if len(alarms_raw) > 50:
+                break
+        # probe할 알람 설정
+        alarm_defs = [{"name": a["AlarmName"]} for a in alarms_raw]
+        probe_scenario["verification"] = {"alarms": alarm_defs}
+        # 알람 메트릭 조건표 생성 (Agent가 trigger↔alarm 인과 관계 판단 가능)
+        _alarm_metric_table = (
+            "\n\n## 알람 메트릭 조건표 (trigger↔alarm 인과 관계 판단용)\n"
+            "| 알람 이름 | 메트릭 | Namespace | Statistic | Comparison | Threshold | Period |\n"
+            "|-----------|--------|-----------|-----------|------------|-----------|--------|\n"
+        )
+        for _a in alarms_raw:
+            _comp = _a.get("ComparisonOperator", "").replace("GreaterThanThreshold", ">").replace("LessThanThreshold", "<").replace("GreaterThanOrEqualToThreshold", ">=")
+            _alarm_metric_table += (
+                f"| {_a['AlarmName']} | {_a.get('MetricName', '?')} | "
+                f"{_a.get('Namespace', '?')} | {_a.get('Statistic', '?')} | "
+                f"{_comp} | {_a.get('Threshold', '?')} | {_a.get('Period', '?')}s |\n"
+            )
+        if not probe_scenario.get("target_service") and app_name:
+            probe_scenario["target_service"] = app_name
+
+        report = probe_scenario_readiness(
+            scenario=probe_scenario,
+            aws_profile=AWS_PROFILE,
+            aws_region=AWS_REGION,
+            namespace=namespace,
+            kubectl_context=_cfg_get(_CFG, "clusters.primary.context", ""),
+            service_port=80,
+        )
+        readiness_section = report.summary_table + _alarm_metric_table
+    except Exception as e:
+        # fallback: 기존 방식 — 메트릭 조건표 포함
+        alarms_fallback = []
+        try:
+            session = _boto_session()
+            cw = session.client("cloudwatch")
+            paginator = cw.get_paginator("describe_alarms")
+            _fb_alarms_raw = []
+            for page in paginator.paginate(StateValue="OK", MaxRecords=100):
+                for a in page.get("MetricAlarms", []):
+                    alarms_fallback.append(a["AlarmName"])
+                    _fb_alarms_raw.append(a)
+                for a in page.get("CompositeAlarms", []):
+                    alarms_fallback.append(a["AlarmName"])
+                if len(alarms_fallback) > 50:
+                    break
+        except Exception:
+            _fb_alarms_raw = []
+        _fb_table = (
+            "\n\n## 알람 메트릭 조건표 (trigger↔alarm 인과 관계 판단용)\n"
+            "| 알람 이름 | 메트릭 | Namespace | Statistic | Comparison | Threshold | Period |\n"
+            "|-----------|--------|-----------|-----------|------------|-----------|--------|\n"
+        )
+        for _a in _fb_alarms_raw:
+            _comp = _a.get("ComparisonOperator", "").replace("GreaterThanThreshold", ">").replace("LessThanThreshold", "<").replace("GreaterThanOrEqualToThreshold", ">=")
+            _fb_table += (
+                f"| {_a['AlarmName']} | {_a.get('MetricName', '?')} | "
+                f"{_a.get('Namespace', '?')} | {_a.get('Statistic', '?')} | "
+                f"{_comp} | {_a.get('Threshold', '?')} | {_a.get('Period', '?')}s |\n"
+            )
+        readiness_section = "## 가용 CloudWatch 알람\n" + (
+            "\n".join(f"- {a}" for a in alarms_fallback) if alarms_fallback else "- (없음)"
+        ) + _fb_table
+    alarm_section = readiness_section
+    alarm_section += (
+        "\n\n⚠️ 기존 알람 중 trigger 효과와 일치하는 것이 있으면 `alarm_name`으로 재사용하세요.\n"
+        "   일치하는 알람이 없으면 `alarm_spec`으로 새 알람 조건을 정의하세요.\n"
+    )
+
+    fis_templates = []
+    try:
+        session = _boto_session()
+        fis = session.client("fis")
+        resp = fis.list_experiment_templates(maxResults=20)
+        for t in resp.get("experimentTemplates", []):
+            desc = t.get("description", "")
+            fis_templates.append(f"{t['id']}: {desc}" if desc else t["id"])
+    except Exception:
+        pass
+    fis_section = "## 가용 FIS 실험 템플릿\n" + (
+        "\n".join(f"- {t}" for t in fis_templates) if fis_templates else "- (없음)"
+    )
+
+    existing_items = _list_scenarios(space_id or AGENT_SPACE_ID)
+    existing_section = "## 기존 시나리오\n" + (
+        "\n".join(f"- {s.get('id','')}: {s.get('name','')}" for s in existing_items)
+        if existing_items else "- (없음)"
+    )
+
+    if include_script:
+        script_section = (
+            "\n\n#include-script\n\n"
+            "## 스크립트 필수 제약\n"
+            "- 알람 ALARM 대기: MAX_WAIT **최소 300초** (알람 설정에서 Period*EvalPeriods*5로 동적 계산)\n"
+            "- 복원 후 OK 대기: OK_WAIT **최소 180초**\n"
+            "- 모든 외부 호출(curl, kubectl port-forward)에 retry 함수 적용 (최소 3회)\n"
+            "- 장애 주입 후 보조 트래픽 생성 (백그라운드 curl 루프)\n"
+            "- 알람 대기 중 REINJECT_INTERVAL=Period 간격으로 장애 재주입"
+        )
+    else:
+        script_section = ""
+
+    format_reminder = (
+        "\n\n## 필수 출력 규칙 (위반 시 교정 요청됨)\n"
+        "- architecture: {components: [{id, label, type}], edges: [{from, to, label}], fault_path: [노드명, ...]} 필수\n"
+        "- normal_flow: [{step: \"1. A → B\", desc: \"설명\"}, ...] 필수\n"
+        "- fault_flow: [{step: \"1. A → B\", desc: \"장애 설명\"}, ...] 필수\n"
+        "- target_service, trigger_mode, category, layer, purpose 필수\n"
+        "- skill_version: \"2.1\"\n"
+        "- verification.steps 각 step에 phase 필수\n"
+    )
+
+    parts = [trigger_tag, "", fm_section, "", app_section, ""]
+    if topo_section:
+        parts.extend([topo_section, ""])
+    parts.extend([alarm_section, "", fis_section, "", existing_section, script_section, format_reminder])
+    return "\n".join(parts)
+
+
+MAX_SCENARIO_FIX_ROUNDS = 3
+
+
+def _extract_json_block(text):
+    """Reply에서 ```json 블록 추출 -> dict 또는 None. trailing comma 자동 수정."""
+    m = re.search(r'```json\s*\n(.*?)```', text, re.DOTALL)
+    if not m:
+        m = re.search(r'```\s*\n(\{.*?\})\s*```', text, re.DOTALL)
+    if not m:
+        return None
+    raw = m.group(1)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    fixed = re.sub(r",\s*([}\]])", r"\1", raw)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        return None
+
+
+def _scenario_fix_loop(scenario, session_id, space_id, include_script):
+    """시나리오 검증 -> 기계적 교정 -> Agent 교정 루프.
+    Returns (scenario, fixes_log, reply_parts)."""
+    from ai_provider import get_provider
+    scenario["_space_id"] = space_id
+    fixes_log = []
+    reply_parts = []
+
+    for round_num in range(1, MAX_SCENARIO_FIX_ROUNDS + 1):
+        auto_fixes = _fix_scenario(scenario)
+        if auto_fixes:
+            fixes_log.extend([f"[자동교정] {f}" for f in auto_fixes])
+
+        errors, warnings = _validate_scenario(scenario)
+        if warnings:
+            fixes_log.extend([f"[경고] {w}" for w in warnings])
+        # phase/skill_version 누락은 교정 대상
+        critical_warnings = [w for w in warnings if "phase" in w or "skill_version" in w]
+        if not errors and not critical_warnings:
+            break
+        if not errors and critical_warnings:
+            errors = critical_warnings
+
+        # phase/skill_version 누락 시 구체적 예시 포함
+        hint = ""
+        if any("phase" in e for e in errors) or any("phase" in w for w in warnings):
+            hint += (
+                '\n\n## phase 필드 필수\n'
+                'verification.steps 각 step에 phase 추가:\n'
+                '- trigger_active: kubectl_check, pod_status, fis_experiment\n'
+                '- effect_observed: alarm_state, metric_check, log_pattern\n'
+                '- reaction_confirmed: investigation_event, agent_investigation\n'
+            )
+        if any("skill_version" in w for w in warnings):
+            hint += '\n\n## skill_version 필수\nJSON 최상위에 `"skill_version": "2.1"` 추가\n'
+        if any("target_service" in e for e in errors):
+            hint += '\n\n## target_service 필수\nJSON 최상위에 `"target_service": "서비스명"` 추가\n'
+
+        fix_msg = (
+            f"생성한 시나리오에 다음 오류가 있습니다. 같은 JSON 포맷으로 수정해서 다시 보내주세요.\n\n"
+            f"## 오류 ({len(errors)}개)\n" +
+            "\n".join(f"- {e}" for e in errors) +
+            hint +
+            "\n\n수정된 ```json 블록을 포함해서 응답해주세요."
+        )
+        if include_script:
+            fix_msg += " 스크립트(```bash)도 포함해주세요."
+
+        print(f"[SCEN-FIX] round {round_num}: errors={errors}")
+        fixes_log.append(f"[교정 라운드 {round_num}] Agent에게 수정 요청: {errors}")
+
+        resp_data = get_provider().send_raw(
+            space_id=space_id, session_id=session_id, prompt=fix_msg,
+        )
+        fix_reply = resp_data["reply"]
+        reply_parts.append(f"\n\n---\n**[자동 교정 라운드 {round_num}]**\n{fix_reply}")
+
+        fixed = _extract_json_block(fix_reply)
+        if fixed:
+            fixed["id"] = scenario.get("id", fixed.get("id", ""))
+            scenario.update(fixed)
+        else:
+            fixes_log.append(f"[라운드 {round_num}] Agent 응답에 JSON 없음 — 교정 중단")
+            break
+    else:
+        remaining_errors, _ = _validate_scenario(scenario)
+        if remaining_errors:
+            fixes_log.append(f"[최대 라운드 도달] 남은 오류: {remaining_errors}")
+
+    scenario.pop("_space_id", None)
+    return scenario, fixes_log, reply_parts
+
+
+@scenario_bp.route("/api/scenario-chat", methods=["POST"])
+def api_scenario_chat():
+    """Agent 채팅 (시나리오 생성). ChatWorker를 통해 Agent 호출."""
+    body = request.json or {}
+    message = body.get("message", "").strip()
+    session_id = body.get("session_id")
+    space_id = _req_space_id("json")
+    template_id = body.get("template_id")
+    app_name = body.get("app_name", "")
+    include_script = body.get("include_script", False)
+    executor_mode = body.get("executor_mode", "") or _cfg_get(_CFG, "executor.default", "classic")
+
+    if not message:
+        return jsonify({"ok": False, "error": "message required"}), 400
+
+    # Multi Agent mode: Generator Agent로 시나리오 생성
+    if executor_mode == "multi_agent" and not session_id:
+        return _scenario_chat_multi_agent(message, space_id, template_id, app_name)
+
+    try:
+        if not session_id:
+            skill_prompt = _build_scenario_chat_context(
+                space_id, template_id=template_id, app_name=app_name,
+                include_script=include_script,
+            )
+            prompt = f"{message}\n\n{skill_prompt}"
+        else:
+            prompt = message
+
+        from ai_provider import get_provider
+        print(f"[SCEN-CHAT] ChatWorker 호출, app: {app_name or '(all)'}, include_script={include_script}")
+        resp_data = get_provider().send_raw(
+            space_id=space_id,
+            session_id=session_id or "",
+            prompt=prompt,
+        )
+
+        reply = resp_data["reply"]
+        new_session_id = resp_data.get("session_id", session_id)
+        has_json = "```json" in reply or "```\n{" in reply
+        has_script = bool(_extract_bash_block(reply)) if include_script else False
+        print(f"[SCEN-CHAT] 응답: {len(reply)} chars, has_json={has_json}, has_script={has_script}, session={new_session_id[:16] if new_session_id else '?'}")
+
+        # 시나리오 JSON이 있으면 검증 + 교정 루프
+        fixes_log = []
+        if has_json:
+            scenario = _extract_json_block(reply)
+            if scenario:
+                scenario, fixes_log, fix_reply_parts = _scenario_fix_loop(
+                    scenario, new_session_id, space_id, include_script)
+                if fix_reply_parts:
+                    reply += "".join(fix_reply_parts)
+                    has_script = has_script or bool(_extract_bash_block(reply))
+
+        resp = {"ok": True, "reply": reply,
+                "session_id": new_session_id, "has_json": has_json}
+        if has_json and scenario:
+            resp["scenario"] = scenario
+        if fixes_log:
+            resp["fixes"] = fixes_log
+        if include_script and has_script:
+            resp["has_script"] = True
+            resp["script"] = _extract_bash_block(reply)
+        return jsonify(resp)
+    except TimeoutError:
+        return jsonify({"ok": False, "error": "Agent 응답 타임아웃 (600초)"}), 504
+    except Exception as e:
+        print(f"[SCEN-CHAT] 오류: {e}")
+        return jsonify({"ok": False, "error": str(e),
+                        "trace": traceback.format_exc()}), 500
+
+
+# ── Multi Agent 비동기 생성 (polling 기반) ────────────────────────────────
+
+import threading as _gen_threading
+
+_gen_jobs = {}  # job_id → {status, events, scenario, error}
+_gen_jobs_lock = _gen_threading.Lock()
+
+
+@scenario_bp.route("/api/scenario-gen-job/<job_id>/status")
+def api_scenario_gen_job_status(job_id):
+    """생성 job 상태 polling."""
+    with _gen_jobs_lock:
+        job = _gen_jobs.get(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "job not found"}), 404
+    return jsonify({"ok": True, **job})
+
+
+def _scenario_chat_multi_agent(message, space_id, template_id, app_name):
+    """Multi Agent 모드: 즉시 job_id 반환, 백그라운드에서 Generator Agent 실행."""
+    import uuid as _uuid
+    job_id = f"gen-{_uuid.uuid4().hex[:8]}"
+
+    with _gen_jobs_lock:
+        _gen_jobs[job_id] = {"status": "generating", "events": [], "scenario": None, "error": None}
+
+    def _run_gen():
+        import re as _re
+        from multi_agent_tools import GENERATOR_TOOLS, configure as configure_tools
+        from multi_agent_prompts import GENERATOR_PROMPT
+        from multi_agent_engine import LiveCallbackHandler, _make_model
+        from execution_context import ExecutionContext
+
+        job = _gen_jobs[job_id]
+
+        class GenCallbackProxy:
+            """LiveCallbackHandler proxy that writes to job events."""
+            def _append_event(self, phase, msg):
+                with _gen_jobs_lock:
+                    job["events"].append({"t": round(time.time(), 1), "phase": phase, "msg": msg})
+
+        proxy = GenCallbackProxy()
+        cb = LiveCallbackHandler(proxy, "Generator")
+
+        exec_ctx = ExecutionContext.for_scenario({"namespace": "default"})
+        configure_tools(
+            kubectl_context=exec_ctx.kubectl_context or "",
+            profile=exec_ctx.profile or "",
+            region=exec_ctx.region or AWS_REGION,
+            namespace=exec_ctx.namespace or "default",
+        )
+
+        model = _make_model(profile=exec_ctx.profile, region=exec_ctx.region or AWS_REGION)
+        agent = Agent(
+            model=model,
+            system_prompt=GENERATOR_PROMPT,
+            tools=list(GENERATOR_TOOLS),
+            callback_handler=cb,
+        )
+
+        prompt = f"{message}\n\n환경을 kubectl_query/aws_query로 확인한 후 시나리오 JSON을 생성하세요. 반드시 JSON만 출력하세요."
+        print(f"[SCEN-GEN-ASYNC] Generator Agent 시작, app={app_name}, template={template_id}")
+
+        try:
+            result_text = str(agent(prompt))
+            print(f"[SCEN-GEN-ASYNC] 완료: {len(result_text)} chars")
+
+            scenario = None
+            for pat in [_re.compile(r'```json\s*\n(.*?)\n```', _re.DOTALL), _re.compile(r'(\{.*\})', _re.DOTALL)]:
+                m = pat.search(result_text)
+                if m:
+                    try:
+                        scenario = json.loads(m.group(1))
+                        break
+                    except json.JSONDecodeError:
+                        continue
+
+            if scenario:
+                scenario["executor"] = "multi_agent"
+                scenario.setdefault("id", f"MA-{template_id or 'gen'}-{int(time.time()) % 10000}")
+                scenario.setdefault("source", "multi-agent-generated")
+                _ensure_evaluation_rubric(scenario)
+
+            with _gen_jobs_lock:
+                job["status"] = "completed"
+                job["scenario"] = scenario
+                job["reply"] = result_text
+        except Exception as e:
+            print(f"[SCEN-GEN-ASYNC] 오류: {e}")
+            with _gen_jobs_lock:
+                job["status"] = "failed"
+                job["error"] = str(e)
+
+    from strands import Agent
+    t = _gen_threading.Thread(target=_run_gen, daemon=True)
+    t.start()
+
+    return jsonify({"ok": True, "job_id": job_id, "status": "generating"})
+
+
+# ---------------------------------------------------------------------------
+# V2: Harness-based scenario generation (submit_tool pattern)
+# ---------------------------------------------------------------------------
+
+@scenario_bp.route("/api/scenario-generate-v2", methods=["POST"])
+def api_scenario_generate_v2():
+    """submit_tool 기반 시나리오 생성 — 자동 검증 + 재시도 루프."""
+    from ai_provider import get_provider
+    from generation.scenario.config import create_scenario_harness, build_generation_context
+
+    body = request.json or {}
+    message = body.get("message", "").strip()
+    space_id = _req_space_id("json")
+    template_id = body.get("template_id")
+    app_name = body.get("app_name", "")
+
+    if not message:
+        return jsonify({"ok": False, "error": "message required"}), 400
+
+    try:
+        skill_prompt = _build_scenario_chat_context(
+            space_id, template_id=template_id, app_name=app_name,
+            include_script=False,
+        )
+        prompt = f"{message}\n\n{skill_prompt}"
+
+        kubectl_context = _cfg_get(_CFG, "clusters.primary.context", "")
+        namespace = _cfg_get(_CFG, "kubernetes.namespace", "dockercoins")
+
+        context = build_generation_context(
+            kubectl_context=kubectl_context,
+            namespace=namespace,
+            aws_profile=AWS_PROFILE,
+            aws_region=AWS_REGION,
+        )
+
+        provider = get_provider()
+        harness = create_scenario_harness(provider)
+        result = harness.generate(prompt=prompt, context=context)
+
+        if result.success:
+            scenario = result.artifact
+            _ensure_evaluation_rubric(scenario)
+            # topology 기반 architecture 보완 (기존 _fix_scenario의 topology 로직)
+            if not scenario.get("architecture"):
+                try:
+                    scenario["_space_id"] = space_id
+                    _fix_scenario(scenario)
+                    scenario.pop("_space_id", None)
+                except Exception:
+                    pass
+
+            resp = {
+                "ok": True,
+                "scenario": scenario,
+                "rounds": result.rounds,
+                "has_json": True,
+                "reply": f"시나리오 생성 완료 ({result.rounds}회 검증). submit_tool 기반.",
+            }
+            if result.validation_history:
+                last = result.validation_history[-1]
+                if last.warnings:
+                    resp["warnings"] = [w.message for w in last.warnings]
+                if last.auto_fixes:
+                    resp["fixes"] = [f"[자동교정] {f}" for f in last.auto_fixes]
+            return jsonify(resp)
+        else:
+            errors = []
+            if result.validation_history:
+                errors = [i.message for i in result.validation_history[-1].errors]
+            return jsonify({
+                "ok": False,
+                "error": f"검증 실패 ({result.rounds}회 시도)",
+                "validation_errors": errors,
+                "rounds": result.rounds,
+            }), 422
+
+    except Exception as e:
+        print(f"[SCEN-V2] 오류: {e}")
+        return jsonify({"ok": False, "error": str(e),
+                        "trace": traceback.format_exc()}), 500
+
+
+# ---------------------------------------------------------------------------
+# Script generation prompt & helpers
+# ---------------------------------------------------------------------------
+SCRIPT_GEN_PROMPT = _prompts.load("generate_script")
+STEPS_GEN_PROMPT = _prompts.load("generate_steps")
+
+
+MAX_STEPS_DRY_RUN_ROUNDS = 2
+
+
+# ---------------------------------------------------------------------------
+# Scenario sanitization for code generation
+# ---------------------------------------------------------------------------
+
+def _command_to_intent(command: str, trigger_type: str, scenario: dict) -> str:
+    """trigger bash 명령에서 의도(intent) 문자열 추출."""
+    target = scenario.get("target_service", "")
+    parts = []
+
+    if "inject-latency" in command:
+        parts.append(f"{target} 서비스에 지연 주입")
+    elif "kubectl run" in command:
+        m = re.search(r'run\s+([\w-]+)', command)
+        pod_name = m.group(1) if m else "pod"
+        m_img = re.search(r'--image=([\w/:.-]+)', command)
+        image = m_img.group(1) if m_img else ""
+        parts.append(f"Pod '{pod_name}' 생성 (image: {image})")
+        if "wget" in command or "curl" in command:
+            parts.append(f"{target} 서비스에 대량/비정상 요청 전송")
+        if "/dev/urandom" in command or "base64" in command:
+            parts.append("비정상 페이로드 포함")
+    elif "aws fis" in command:
+        m = re.search(r'--experiment-template-id\s+([\w-]+)', command)
+        tmpl = m.group(1) if m else ""
+        parts.append(f"FIS 실험 시작 (template: {tmpl})")
+    elif "port-forward" in command:
+        parts.append(f"{target} 서비스 port-forward 접근")
+
+    if not parts:
+        parts.append(f"{trigger_type} 기반 장애 주입")
+
+    purpose = scenario.get("purpose", "")[:80]
+    return f"[{trigger_type}] " + "; ".join(parts) + (f" — {purpose}" if purpose else "")
+
+
+def _restore_to_intent(command: str, scenario: dict) -> str:
+    """restore 명령에서 의도 추출."""
+    target = scenario.get("target_service", "")
+    parts = []
+    if "clear-latency" in command:
+        parts.append(f"{target} 지연 해제")
+    if "delete pod" in command:
+        m = re.search(r'delete\s+pods?\s+([\w-]+)', command)
+        parts.append(f"{m.group(1) if m else '장애 pod'} 삭제")
+    if "rollout restart" in command:
+        m = re.search(r'deployment/([\w-]+)', command)
+        parts.append(f"{m.group(1) if m else target} 롤아웃 재시작")
+    return "; ".join(parts) if parts else "장애 원상복구"
+
+
+def _cleanup_to_intent(command: str, scenario: dict) -> str:
+    """pre_cleanup 명령에서 의도 추출."""
+    parts = []
+    if "delete pod" in command:
+        m = re.search(r'delete\s+pods?\s+([\w-]+)', command)
+        parts.append(f"{m.group(1) if m else '잔여 pod'} 삭제")
+    if "clear-latency" in command:
+        parts.append("이전 지연 해제")
+    return "; ".join(parts) if parts else "이전 실행 잔여물 정리"
+
+
+def _sanitize_scenario_for_codegen(scenario: dict) -> dict:
+    """코드 생성 Agent에게 보내기 전, bash command를 intent로 교체."""
+    import copy
+    s = copy.deepcopy(scenario)
+
+    trigger = s.get("trigger", {})
+    if isinstance(trigger, dict) and trigger.get("command"):
+        trigger["intent"] = _command_to_intent(trigger["command"], trigger.get("type", ""), s)
+        del trigger["command"]
+
+    restore = s.get("restore", {})
+    if isinstance(restore, dict) and restore.get("command"):
+        restore["intent"] = _restore_to_intent(restore["command"], s)
+        del restore["command"]
+
+    pre_cleanup = s.get("pre_cleanup", {})
+    if isinstance(pre_cleanup, dict) and pre_cleanup.get("command"):
+        pre_cleanup["intent"] = _cleanup_to_intent(pre_cleanup["command"], s)
+        del pre_cleanup["command"]
+
+    return s
+
+
+def _dry_run_steps(scenario: dict, steps_code: str) -> dict:
+    """steps.py를 임시 파일에 쓰고 --dry-run으로 실행. 30초 타임아웃."""
+    import tempfile
+    import sys
+
+    runner_path = os.path.join(os.path.dirname(__file__), "scenario_runner.py")
+    scenario_json_str = json.dumps(scenario, ensure_ascii=False)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, dir="/tmp") as f:
+        f.write(steps_code)
+        tmp_path = f.name
+
+    try:
+        env = {**os.environ, "AWS_PAGER": "", "PYTHONUNBUFFERED": "1"}
+        if AWS_PROFILE:
+            env["AWS_PROFILE"] = AWS_PROFILE
+        if AWS_REGION:
+            env["AWS_REGION"] = AWS_REGION
+        path = env.get("PATH", "")
+        for p in ("/opt/homebrew/bin", "/usr/local/bin"):
+            if p not in path:
+                path = p + ":" + path
+        env["PATH"] = path
+
+        namespace = _cfg_get(_CFG, "kubernetes.namespace", "dockercoins")
+        cluster_name = _cfg_get(_CFG, "kubernetes.cluster_name", "devops-simulator")
+        kubectl_context = _cfg_get(_CFG, "clusters.primary.context", "")
+
+        cmd = [
+            sys.executable, runner_path, tmp_path,
+            "--dry-run",
+            "--namespace", namespace,
+            "--aws-profile", AWS_PROFILE or "",
+            "--aws-region", AWS_REGION or "us-east-1",
+        ]
+        if kubectl_context:
+            cmd.extend(["--kubectl-context", kubectl_context])
+
+        # alarm_name from scenario
+        alarm_name = ""
+        verification = scenario.get("verification", {})
+        alarm_list = verification.get("alarms", [])
+        if alarm_list:
+            alarm_name = alarm_list[0].get("name", "")
+        if alarm_name:
+            cmd.extend(["--alarm-name", alarm_name])
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, env=env,
+        )
+
+        stdout = result.stdout
+        stderr = result.stderr
+        exit_code = result.returncode
+
+        error_msg = ""
+        if exit_code != 0:
+            for line in (stdout + "\n" + stderr).split("\n"):
+                if "StopScenario" in line or "FAIL" in line or "Error" in line:
+                    error_msg += line + "\n"
+            if not error_msg:
+                error_msg = stderr[-500:] if stderr else stdout[-500:]
+
+        return {
+            "exit_code": exit_code,
+            "error": error_msg.strip(),
+            "stdout": stdout[-1000:],
+            "stderr": stderr[-500:],
+        }
+    except subprocess.TimeoutExpired:
+        return {"exit_code": 1, "error": "dry-run 30초 타임아웃", "stdout": "", "stderr": ""}
+    except Exception as e:
+        return {"exit_code": 1, "error": str(e), "stdout": "", "stderr": ""}
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+def _steps_fix_loop(scenario: dict, steps_code: str, dry_run_result: dict,
+                    session_id: str, space_id: str) -> tuple[str, str, list]:
+    """Dry-run 실패 → Agent에게 에러+코드+fix hint 전달 → 수정된 코드 수신 → 재검증."""
+    from ai_provider import get_provider
+    fix_log = []
+
+    for round_num in range(MAX_STEPS_DRY_RUN_ROUNDS):
+        fix_prompt = (
+            f"생성된 steps.py의 dry-run 검증이 실패했습니다. 에러를 수정해주세요.\n\n"
+            f"## 에러\n```\n{dry_run_result['error']}\n```\n\n"
+            f"## 현재 코드\n```python\n{steps_code}\n```\n\n"
+            f"수정한 전체 코드를 ```python 블록으로 반환하세요."
+        )
+
+        print(f"[DRY-RUN-FIX] Round {round_num + 1}: Agent에게 수정 요청")
+        resp_data = get_provider().send_raw(
+            space_id=space_id,
+            session_id=session_id,
+            prompt=fix_prompt,
+        )
+        reply = resp_data.get("reply", "")
+        fixed_code = _extract_python_block(reply)
+
+        if not fixed_code:
+            fix_log.append({"round": round_num + 1, "status": "no_code", "error": "Agent가 python 코드를 반환하지 않음"})
+            continue
+
+        steps_code = fixed_code
+        dry_run_result = _dry_run_steps(scenario, steps_code)
+        fix_log.append({
+            "round": round_num + 1,
+            "status": "pass" if dry_run_result["exit_code"] == 0 else "fail",
+            "error": dry_run_result.get("error", ""),
+        })
+
+        if dry_run_result["exit_code"] == 0:
+            print(f"[DRY-RUN-FIX] Round {round_num + 1}: PASS")
+            return steps_code, "fixed", fix_log
+
+    print(f"[DRY-RUN-FIX] {MAX_STEPS_DRY_RUN_ROUNDS}회 시도 후에도 실패")
+    return steps_code, "still_failing", fix_log
+
+
+@scenario_bp.route("/api/scenario-generate-script", methods=["POST"])
+def api_scenario_generate_script():
+    """Agent에게 시나리오 실행 스크립트 생성 요청. ChatWorker를 통해 Agent 호출.
+
+    Python steps의 경우:
+    1. readiness probe → enriched context
+    2. Agent 호출 → 코드 추출
+    3. validate_steps_code() 정적 검증
+    4. _dry_run_steps() 런타임 검증 (8초)
+    5. 실패 시 _steps_fix_loop() 교정 (최대 2회)
+    """
+    body = request.json or {}
+    scenario_id = body.get("scenario_id", "").strip()
+    space_id = _req_space_id("json")
+    session_id = body.get("session_id")
+    script_type = body.get("script_type", "python")
+
+    if not scenario_id:
+        return jsonify({"ok": False, "error": "scenario_id required"}), 400
+
+    scenario = _get_scenario(space_id, scenario_id)
+    if not scenario:
+        return jsonify({"ok": False, "error": "Scenario not found"}), 404
+
+    profile = _cfg_get(_CFG, "aws.profile", os.environ.get("AWS_PROFILE", ""))
+    region = AWS_REGION
+
+    if script_type == "python":
+        sanitized = _sanitize_scenario_for_codegen(scenario)
+        scenario_json = json.dumps(sanitized, indent=2, ensure_ascii=False)
+    else:
+        scenario_json = json.dumps(scenario, indent=2, ensure_ascii=False)
+
+    # Readiness probe for python steps
+    readiness_context = ""
+    if script_type == "python":
+        try:
+            from readiness_probe import probe_scenario_readiness
+            namespace = _cfg_get(_CFG, "kubernetes.namespace", "dockercoins")
+            kubectl_context = _cfg_get(_CFG, "clusters.primary.context", "")
+            report = probe_scenario_readiness(
+                scenario=scenario,
+                aws_profile=AWS_PROFILE,
+                aws_region=AWS_REGION,
+                namespace=namespace,
+                kubectl_context=kubectl_context,
+            )
+            readiness_context = "\n\n" + report.summary_table
+            if not report.ready:
+                blocked = [r for r in report.resources if not r.ok]
+                hints = "; ".join(r.fix_hint for r in blocked if r.fix_hint)
+                print(f"[SCRIPT-GEN] Readiness probe: NOT READY — {hints}")
+        except Exception as e:
+            print(f"[SCRIPT-GEN] Readiness probe 오류 (계속 진행): {e}")
+
+    if script_type == "python":
+        prompt = STEPS_GEN_PROMPT
+        full_prompt = (
+            f"다음 시나리오를 확인해줘:\n```json\n{scenario_json}\n```\n"
+            f"{readiness_context}\n\n{prompt}"
+        )
+    else:
+        prompt = SCRIPT_GEN_PROMPT.format(profile=profile, region=region)
+        full_prompt = f"다음 시나리오를 확인해줘:\n```json\n{scenario_json}\n```\n\n{prompt}"
+
+    try:
+        from ai_provider import get_provider
+        print(f"[SCRIPT-GEN] ChatWorker 호출: scenario={scenario_id}, type={script_type}")
+        resp_data = get_provider().send_raw(
+            space_id=space_id,
+            session_id=session_id or "",
+            prompt=full_prompt,
+        )
+
+        reply = resp_data["reply"]
+        new_session_id = resp_data.get("session_id", session_id)
+
+        if script_type == "python":
+            script = _extract_python_block(reply)
+            if not script:
+                return jsonify({"ok": False, "error": "Agent가 python 스크립트를 반환하지 않음", "reply": reply}), 422
+
+            # Static validation
+            from validate_steps import validate_steps_code
+            errors, warnings = validate_steps_code(script)
+            if errors:
+                print(f"[SCRIPT-GEN] 정적 검증 실패: {errors}")
+                # Agent에게 수정 요청
+                fix_prompt = (
+                    f"생성된 steps.py에 정적 검증 오류가 있습니다:\n"
+                    f"{chr(10).join('- ' + e for e in errors)}\n\n"
+                    f"```python\n{script}\n```\n\n수정한 전체 코드를 ```python 블록으로 반환하세요."
+                )
+                fix_resp = get_provider().send_raw(
+                    space_id=space_id, session_id=new_session_id, prompt=fix_prompt)
+                fixed = _extract_python_block(fix_resp.get("reply", ""))
+                if fixed:
+                    script = fixed
+
+            # Dry-run gate
+            dry_run_result = _dry_run_steps(scenario, script)
+            dry_run_status = "pass" if dry_run_result["exit_code"] == 0 else "fail"
+            fix_log = []
+
+            if dry_run_result["exit_code"] != 0:
+                print(f"[SCRIPT-GEN] Dry-run 실패: {dry_run_result['error'][:200]}")
+                script, fix_status, fix_log = _steps_fix_loop(
+                    scenario, script, dry_run_result, new_session_id, space_id)
+                dry_run_status = fix_status
+
+            _save_scenario_script(scenario_id, script, script_type="python")
+
+            resp = {
+                "ok": True,
+                "scenario_id": scenario_id,
+                "session_id": new_session_id,
+                "script": script,
+                "script_type": script_type,
+                "length": len(script),
+                "dry_run": dry_run_status,
+            }
+            if fix_log:
+                resp["fix_rounds"] = fix_log
+            return jsonify(resp)
+        else:
+            script = _extract_bash_block(reply)
+            if not script:
+                return jsonify({"ok": False, "error": "Agent가 bash 스크립트를 반환하지 않음", "reply": reply}), 422
+            _save_scenario_script(scenario_id, script, script_type="bash")
+
+            return jsonify({
+                "ok": True,
+                "scenario_id": scenario_id,
+                "session_id": new_session_id,
+                "script": script,
+                "script_type": script_type,
+                "length": len(script),
+            })
+    except TimeoutError:
+        return jsonify({"ok": False, "error": "Agent 응답 타임아웃 (600초)"}), 504
+    except Exception as e:
+        print(f"[SCRIPT-GEN] 오류: {e}")
+        return jsonify({"ok": False, "error": str(e), "trace": traceback.format_exc()}), 500
+
+
+def _extract_bash_block(text):
+    blocks = re.findall(r'```(?:bash|sh)\s*\n(.*?)```', text, re.DOTALL)
+    if not blocks:
+        return None
+    return max(blocks, key=len).strip()
+
+
+def _extract_python_block(text):
+    blocks = re.findall(r'```(?:python)\s*\n(.*?)```', text, re.DOTALL)
+    if not blocks:
+        return None
+    return max(blocks, key=len).strip()
+
+
+def _save_scenario_script(scenario_id, script, script_type="bash"):
+    base = os.path.join(os.path.dirname(__file__), "scenarios", scenario_id)
+    os.makedirs(base, exist_ok=True)
+    filename = "steps.py" if script_type == "python" else "run.sh"
+    with open(os.path.join(base, filename), "w") as f:
+        f.write(script)
+    print(f"[SCRIPT] saved scenarios/{scenario_id}/{filename} ({len(script)} chars)")
+
+
+def _get_scenario_script(scenario_id):
+    """Return (script_content, script_type). steps.py takes priority over run.sh."""
+    base = os.path.join(os.path.dirname(__file__), "scenarios", scenario_id)
+    py_path = os.path.join(base, "steps.py")
+    if os.path.exists(py_path):
+        with open(py_path) as f:
+            return f.read(), "python"
+    sh_path = os.path.join(base, "run.sh")
+    if os.path.exists(sh_path):
+        with open(sh_path) as f:
+            return f.read(), "bash"
+    return None, None
+
+
+# ---------------------------------------------------------------------------
+# Improvement loop prompt & routes
+# ---------------------------------------------------------------------------
+IMPROVE_PROMPT_TEMPLATE = _prompts.load("improve")
+
+
+@scenario_bp.route("/api/scenario-improvements", methods=["POST"])
+def api_scenario_improvements():
+    """실패 분석 + 개선 제안. ChatWorker를 통해 Agent 호출."""
+    body = request.json or {}
+    scenario_id = body.get("scenario_id", "")
+    space_id = _req_space_id("json")
+    run_id = body.get("run_id")
+
+    scenario = _get_scenario(space_id, scenario_id)
+    if not scenario:
+        return jsonify({"ok": False, "error": "Scenario not found"}), 404
+
+    run_data = None
+    if run_id:
+        from verifier import get_active_run, get_history
+        run = get_active_run(run_id)
+        if run:
+            run_data = run.to_dict()
+        else:
+            try:
+                items, _ = get_history(limit=100)
+                for h in items:
+                    if h.get("run_id") == run_id:
+                        run_data = h
+                        break
+            except Exception:
+                pass
+
+    existing_rules = _load_prompt_rules(space_id)
+    script_content = _get_scenario_script(scenario_id) or "스크립트 없음"
+
+    scenario_summary = {k: v for k, v in scenario.items()
+                        if k in ("id", "name", "category", "trigger", "verification", "pre_cleanup", "restore")}
+    run_summary = None
+    if run_data:
+        run_summary = {
+            "result": run_data.get("result"),
+            "status": run_data.get("status"),
+            "checkpoints": run_data.get("checkpoints", []),
+            "alarm_results": run_data.get("alarm_results", []),
+            "script_output": {
+                "exit_code": run_data.get("script_output", {}).get("exit_code"),
+                "stdout": run_data.get("script_output", {}).get("stdout", "")[-2000:],
+                "stderr": run_data.get("script_output", {}).get("stderr", "")[-1000:],
+            },
+        }
+
+    prompt = IMPROVE_PROMPT_TEMPLATE.format(
+        scenario_json=json.dumps(scenario_summary, indent=2, ensure_ascii=False),
+        script_content=f"```bash\n{script_content[-3000:]}\n```" if script_content != "스크립트 없음" else script_content,
+        review_result="리뷰 미수행",
+        execution_result=json.dumps(run_summary, indent=2, ensure_ascii=False) if run_summary else "실행 미수행",
+        existing_rules="\n".join(f"- {r}" for r in existing_rules) if existing_rules else "없음",
+    )
+
+    try:
+        from ai_provider import get_provider
+        print(f"[IMPROVE] ChatWorker 호출: scenario={scenario_id}, run={run_id}, prompt_size={len(prompt)}")
+        resp_data = get_provider().send_raw(
+            space_id=space_id,
+            session_id="",
+            prompt=prompt,
+        )
+
+        reply = resp_data["reply"]
+        improvements = _extract_json_from_text(reply) or {}
+
+        infra_gaps = improvements.get("infrastructure_gaps", [])
+        blocking = [g for g in infra_gaps if g.get("blocking")]
+        if blocking:
+            improvements["_blocked"] = True
+            improvements["_blocking_summary"] = "; ".join(
+                f"{g['resource']}: {g.get('fix_command','(수동 조치 필요)')}" for g in blocking
+            )
+
+        return jsonify({"ok": True, "improvements": improvements})
+    except TimeoutError:
+        return jsonify({"ok": False, "error": "Agent 응답 타임아웃 (600초)"}), 504
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def _extract_json_from_text(text):
+    """Agent 응답 텍스트에서 JSON 블록 추출."""
+    for pattern in [r"```json\s*\n(.*?)\n```", r"```\s*\n(.*?)\n```"]:
+        m = re.search(pattern, text, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except json.JSONDecodeError:
+                pass
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+@scenario_bp.route("/api/scenario-improvements/accept", methods=["POST"])
+def api_accept_improvements():
+    body = request.json or {}
+    space_id = _req_space_id("json")
+    scenario_id = body.get("scenario_id", "")
+
+    new_rules = body.get("prompt_rules", [])
+    if new_rules:
+        existing = _load_prompt_rules(space_id)
+        existing.extend(new_rules)
+        _save_prompt_rules(space_id, existing)
+
+    scenario_fixes = body.get("scenario_fixes", [])
+    fixes_applied = 0
+    if scenario_fixes:
+        scenario = _get_scenario(space_id, scenario_id)
+        if scenario:
+            for fix in scenario_fixes:
+                field = fix.get("field", "")
+                new_val = fix.get("new")
+                if field and new_val is not None:
+                    try:
+                        keys = field.split(".")
+                        obj = scenario
+                        for k in keys[:-1]:
+                            if isinstance(obj, list) and k.isdigit():
+                                obj = obj[int(k)]
+                            elif isinstance(obj, dict):
+                                obj = obj.setdefault(k, {})
+                            else:
+                                raise KeyError(f"cannot traverse {type(obj).__name__} with key {k}")
+                        last = keys[-1]
+                        if isinstance(obj, list) and last.isdigit():
+                            obj[int(last)] = new_val
+                        elif isinstance(obj, dict):
+                            obj[last] = new_val
+                        fixes_applied += 1
+                    except (KeyError, IndexError, TypeError) as e:
+                        print(f"[ACCEPT] skip fix {field}: {e}")
+            _save_scenario(space_id, scenario)
+
+    script_updated = False
+    script_fix = body.get("script_fix")
+    if script_fix and scenario_id:
+        _save_scenario_script(scenario_id, script_fix)
+        script_updated = True
+
+    infra_gaps = body.get("infrastructure_gaps", [])
+
+    return jsonify({
+        "ok": True,
+        "rules_added": len(new_rules),
+        "fixes_applied": fixes_applied,
+        "script_updated": script_updated,
+        "infrastructure_gaps": infra_gaps,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Prompt rules persistence helpers
+# ---------------------------------------------------------------------------
+_PROMPT_RULES_CACHE = {}
+
+
+def _load_prompt_rules(space_id):
+    if space_id in _PROMPT_RULES_CACHE:
+        return list(_PROMPT_RULES_CACHE[space_id])
+    try:
+        resp = _arch_table().get_item(Key={"scenario_id": space_id, "run_id": "prompt-rules"})
+        rules = resp.get("Item", {}).get("rules", [])
+        _PROMPT_RULES_CACHE[space_id] = list(rules)
+        return list(rules)
+    except Exception:
+        return []
+
+
+def _save_prompt_rules(space_id, rules):
+    _PROMPT_RULES_CACHE[space_id] = list(rules)
+    try:
+        _arch_table().put_item(Item={
+            "scenario_id": space_id,
+            "run_id": "prompt-rules",
+            "rules": rules,
+        })
+    except Exception as e:
+        print(f"[RULES] save failed: {e}")

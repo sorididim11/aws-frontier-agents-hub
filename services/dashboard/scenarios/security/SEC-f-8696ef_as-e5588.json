@@ -1,0 +1,70 @@
+{
+  "id": "SEC-f-8696ef",
+  "devops_space_id": "as-e558819b-a2e2-460b-85ff-1a58004f9f58",
+  "name": "Unauthenticated IDOR in Security Insights Finding Scenario Endpoint Exposes Cross-Tenant Vulnerability Data",
+  "description": "The endpoint GET /api/security/insights/finding-scenario/{finding_id} returns complete security finding scenario details to any unauthenticated user who knows or can guess the finding_id. There is absolutely no authentication check (no token, session, or cookie required) and no tenant/ownership validation.\n\nThe endpoint exposes highly sensitive security data belonging to specific tenants including:\n- Complete vulnerability descriptions with exploitation details\n- Step-by-step attack instructions with HTTP methods, paths, and payloads (e.g., POST /api/scenario-run/c5e27f81/exec-cmd with command injection body)\n- Target service names and internal endpoints (e.g., http://dashboard.es-devops-agent.com/api/scenario-run)\n- Risk levels (CRITICAL) and vulnerability categorization (SERVER_SIDE_REQUEST_FORGERY)\n- Infrastructure topology showing attack chain edges (attacker → alb → dashboard)\n- Trigger commands for exploitation\n- Registration timestamps and source attribution\n\nThe finding f-38aefc10-d4c4-4f87-99cd-728039a9f3e5 belongs to security space 'devops-agent-test-security' (sec_space_id: as-2f0e7212-47f7-406a-b115-646f0c7d5717) linked to devops_space aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee, targeting webui.es-devops-agent.com.\n\nAdditionally, partial finding IDs are accepted (e.g., 'f-38aefc' matches the full UUID), significantly lowering the barrier for enumeration. The companion endpoint /api/settings/security/links returns ALL security space links across ALL tenants without authentication, exposing devops_space_ids, security_space_ids, pentest_ids, target domains, and space names - providing the information needed to understand the tenant structure and target specific organizations.",
+  "category": "security-unknown",
+  "app_name": "unknown",
+  "layer": "app",
+  "target_service": "unknown",
+  "failure_mode": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "INSECURE_DIRECT_OBJECT_REFERENCE 취약점 — Unauthenticated IDOR in Security Insights Finding Scenario Endpoint Exposes Cross-Tenant Vulnerability Data",
+  "source": "security-agent",
+  "finding_id": "f-8696efc8-0c76-45af-82a2-3a9c5253b156",
+  "risk_level": "HIGH",
+  "risk_type": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "endpoint": "http:/",
+  "attack_steps": [
+    {
+      "method": "GET",
+      "path": "/api/security/insights/finding-scenario/f-38aefc10-d4c4-4f87-99cd-728039a9f3e5",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/insights/finding-scenario/f-nonexistent-fake-id",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/insights/finding-scenario/f-38aefc",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "target",
+      "label": "/api/security/insights/finding-scenario/f-38aefc10-d4c4-4f87-99cd-728039a9f3e5"
+    }
+  ],
+  "registered_at": "2026-06-09T11:51:54.655947+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: INSECURE_DIRECT_OBJECT_REFERENCE on \n# Endpoint: http://api/security/insights/finding-scenario/f-38aefc10-d4c4-4f87-99cd-728039a9f3e5"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "INSECURE_DIRECT_OBJECT_REFERENCE 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

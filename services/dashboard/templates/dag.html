@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Investigation DAG — AWS Agent Space</title>
+<link rel="icon" type="image/svg+xml" href="/static/icons/aws/aws-cloud.svg">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#e2e8f0;overflow-y:auto;min-height:100vh;display:flex;flex-direction:column}
+
+.header{padding:6px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1e293b;flex-shrink:0}
+.header h1{font-size:.85rem;color:#38bdf8;font-weight:600;white-space:nowrap}
+.task-id{font-size:.6rem;color:#64748b;font-family:monospace}
+.controls{display:flex;gap:5px;margin-left:auto}
+.controls button{padding:3px 8px;background:#334155;color:#e2e8f0;border:none;border-radius:4px;cursor:pointer;font-size:.65rem}
+.controls button:hover{background:#475569}
+.status-badge{padding:2px 7px;border-radius:10px;font-size:.6rem;font-weight:600}
+.status-badge.complete{background:#6366f120;color:#a5b4fc;border:1px solid #6366f1}
+.status-badge.offline{background:#47556920;color:#94a3b8;border:1px solid #475569}
+
+.history-bar{padding:5px 16px;background:#111827;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:.65rem;flex-wrap:wrap}
+.history-bar label{color:#94a3b8;white-space:nowrap}
+.history-bar select,.history-bar input[type=text]{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 6px;font-size:.63rem}
+.history-bar button{padding:3px 10px;background:#3b82f6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.63rem}
+.history-bar button:hover{background:#2563eb}
+.history-bar .status{color:#64748b;font-size:.58rem}
+
+.dag-split{display:flex;height:70vh;min-height:400px;flex-shrink:0}
+.dag-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.dag-panel+.dag-panel{border-left:2px solid #334155}
+.dag-panel-header{padding:4px 12px;background:#1e293b;font-size:.65rem;color:#94a3b8;display:flex;align-items:center;gap:6px;flex-shrink:0;border-bottom:1px solid #334155}
+.dag-panel-header .plabel{font-weight:600}
+.dag-panel-header .plabel.p1{color:#3b82f6}
+.dag-panel-header .plabel.p2{color:#a855f7}
+.dag-area{flex:1;overflow:auto;position:relative}
+.p2-waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#475569;text-align:center;gap:8px}
+.p2-waiting .icon{font-size:1.5rem;opacity:.3}
+.p2-waiting .msg{font-size:.65rem;line-height:1.5}
+
+svg{display:block}
+svg text{font-family:-apple-system,sans-serif;pointer-events:none}
+.node{cursor:pointer}
+.node:hover rect,.node:hover circle{filter:brightness(1.3)}
+
+#tooltip{display:none;position:fixed;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:10px 14px;font-size:.72rem;max-width:400px;z-index:100;pointer-events:none;line-height:1.5;color:#cbd5e1;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+#tooltip .tt{color:#38bdf8;font-weight:600;margin-bottom:3px}
+#tooltip .tm{color:#64748b;font-size:.6rem;border-top:1px solid #334155;padding-top:3px;margin-top:3px}
+
+/* ── Hypothesis panel ── */
+.scen-hyp-alarm{padding:6px 10px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:8px;font-size:.62rem;color:#86efac;margin-bottom:8px}
+.scen-hyp-card{border:1px solid rgba(51,65,85,0.3);border-radius:8px;margin:6px 0;overflow:hidden}
+.scen-hyp-header{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;transition:background .15s}
+.scen-hyp-header:hover{filter:brightness(1.1)}
+.scen-hyp-num{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700;border:1px solid;flex-shrink:0}
+.scen-hyp-title{font-weight:600;font-size:.64rem;color:#e2e8f0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scen-hyp-tag{font-size:.48rem;padding:2px 6px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#94a3b8}
+.scen-hyp-status{font-size:.52rem;padding:2px 8px;border:1px solid;border-radius:4px;font-weight:600;flex-shrink:0}
+.scen-hyp-link{font-size:.48rem;color:#64748b}
+.scen-hyp-step{padding:6px 12px;border-bottom:1px solid rgba(30,41,59,0.6)}
+.scen-hyp-step.key{background:rgba(34,197,94,0.04)}
+.scen-hyp-step-meta{display:flex;align-items:center;gap:6px}
+.scen-hyp-step-time{font-size:.48rem;color:#475569;min-width:36px;font-family:'SF Mono',monospace}
+.scen-hyp-step-icon{font-size:.62rem}
+.scen-hyp-step-src{font-size:.48rem;padding:1px 5px;background:#0f172a;border:1px solid #334155;border-radius:3px;color:#64748b;font-family:'SF Mono',monospace}
+.scen-hyp-step-key{font-size:.48rem;padding:1px 5px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:#86efac;border-radius:3px}
+.scen-hyp-step-text{font-size:.6rem;color:#cbd5e1;margin-top:3px;padding-left:22px;line-height:1.5}
+.scen-hyp-reason{padding:6px 12px;font-size:.58rem;border-top:1px solid #1e293b;line-height:1.4}
+.scen-hyp-rootcause{margin-top:8px;padding:10px 12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:8px}
+.scen-hyp-rootcause-title{font-size:.66rem;font-weight:600;color:#4ade80}
+.scen-hyp-rootcause-name{font-size:.62rem;color:#bbf7d0;margin-top:3px;font-weight:600}
+.scen-hyp-rootcause-desc{font-size:.56rem;color:#86efac;margin-top:3px;line-height:1.5}
+.scen-hyp-footer{font-size:.48rem;color:#475569;margin-top:6px;text-align:right}
+
+/* ── Rubric panel ── */
+.scen-rub-summary{margin-bottom:10px;padding:10px 12px;background:#0f172a;border:1px solid #1e293b;border-radius:8px}
+.scen-rub-score{font-size:.9rem;font-weight:700;color:#fbbf24}
+.scen-rub-score-max{font-size:.62rem;font-weight:400;color:#64748b}
+.scen-rub-meta{font-size:.52rem;color:#64748b;margin-top:2px;font-family:'SF Mono',monospace}
+.scen-rub-item{margin-bottom:6px;padding:8px 10px;background:#0f172a;border-radius:6px;border-left:3px solid #334155}
+.scen-rub-item-hdr{display:flex;justify-content:space-between;align-items:center}
+.scen-rub-item-name{font-size:.62rem;color:#e2e8f0;font-weight:500}
+.scen-rub-item-weight{font-size:.52rem;color:#64748b;font-weight:400}
+.scen-rub-item-score{font-size:.72rem;font-weight:700}
+.scen-rub-bar{background:#1e293b;border-radius:3px;height:4px;margin:4px 0}
+.scen-rub-bar-fill{height:4px;border-radius:3px;transition:width .5s ease}
+.scen-rub-item-criteria{font-size:.52rem;color:#94a3b8;margin-top:2px;line-height:1.4}
+.scen-rub-item-reason{font-size:.52rem;color:#cbd5e1;margin-top:3px;line-height:1.4}
+.scen-analysis-title{font-size:.66rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding:6px 0;border-bottom:1px solid #1e293b}
+
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:200;justify-content:center;align-items:center}
+.modal-overlay.open{display:flex}
+.modal{background:#1e293b;border:1px solid #334155;border-radius:12px;width:640px;max-height:80vh;overflow-y:auto;padding:20px}
+.modal h3{font-size:.85rem;color:#38bdf8;margin-bottom:10px}
+.modal .meta{font-size:.7rem;color:#94a3b8;margin-bottom:12px;line-height:1.6}
+.modal .meta strong{color:#e2e8f0}
+.modal .insight-box{background:#0f172a;border-left:3px solid #38bdf8;padding:8px 12px;margin-bottom:12px;font-size:.73rem;color:#cbd5e1;line-height:1.5}
+.signal-card{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px;margin-bottom:8px;font-size:.68rem}
+.signal-card .st{color:#f59e0b;font-weight:600;font-size:.63rem;text-transform:uppercase;margin-bottom:4px}
+.signal-card .sb{color:#cbd5e1;line-height:1.5;white-space:pre-wrap;font-family:'SF Mono',monospace;font-size:.65rem;max-height:200px;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Investigation DAG</h1>
+    <span class="status-badge offline" id="statusBadge">OFFLINE</span>
+    <span class="task-id" id="taskIdLabel"></span>
+    <div class="controls">
+        <button onclick="toggleLayout()" id="btnLayout">⇄ 가로</button>
+        <button onclick="runBedrock()" id="btnBedrock">Bedrock</button>
+        <button onclick="fitView()">Fit</button>
+    </div>
+</div>
+
+<div class="history-bar">
+    <label>Agent Space:</label>
+    <input type="text" id="inputSpaceId" value="" placeholder="Agent Space ID" style="width:240px;font-family:monospace;">
+    <select id="historySelect" onchange="onHistorySelect()" style="max-width:340px;">
+        <option value="">-- select investigation --</option>
+    </select>
+    <label>Task ID:</label>
+    <input type="text" id="inputTaskId" placeholder="select or type" style="width:260px;font-family:monospace;">
+    <button onclick="loadTask()">Load</button>
+    <span class="status" id="loadStatus"></span>
+</div>
+
+<div class="dag-split">
+    <div class="dag-panel">
+        <div class="dag-panel-header"><span class="plabel p1">Phase 1</span> Rule-based</div>
+        <div class="dag-area" id="area1"><svg id="svg1" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+    <div class="dag-panel">
+        <div class="dag-panel-header"><span class="plabel p2">Phase 2</span> Bedrock <span id="p2status" style="font-size:.55rem;color:#64748b;margin-left:4px"></span></div>
+        <div class="dag-area" id="area2">
+            <div class="p2-waiting" id="p2wait">
+                <div class="icon">&#129504;</div>
+                <div class="msg">Load data, then click <b>Bedrock</b></div>
+            </div>
+            <svg id="svg2" xmlns="http://www.w3.org/2000/svg" style="display:none"></svg>
+        </div>
+    </div>
+</div>
+
+<div id="analysisSection" style="display:none;padding:12px 16px;border-top:1px solid #1e293b;flex-shrink:0">
+    <div id="hypSection"></div>
+    <div id="rubSection" style="margin-top:12px"></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <h3 id="modalTitle"></h3>
+        <div id="modalBody"></div>
+    </div>
+</div>
+<div id="tooltip"></div>
+
+<script>
+// ================================================================
+// STATE
+// ================================================================
+var state = { taskId:'', records:[], p1:null, p2:null, layout:'vertical' };
+
+// ================================================================
+// HISTORY / LOADING
+// ================================================================
+var _historyMap={};
+function loadHistory(){
+    var hsid=$('inputSpaceId').value.trim();
+    var hurl='/api/history?limit=30';
+    if(hsid)hurl+='&space_id='+enc(hsid);
+    fetch(hurl).then(function(r){return r.json();}).then(function(d){
+        var sel=$('historySelect');
+        sel.innerHTML='<option value="">-- select investigation --</option>';
+        _historyMap={};
+        (d.items||[]).forEach(function(item){
+            if(!item.investigation_task_id)return;
+            _historyMap[item.investigation_task_id]={run_id:item.run_id||'',scenario_id:item.scenario_id||''};
+            var o=document.createElement('option');
+            o.value=item.investigation_task_id;
+            o.textContent='['+(item.scenario_id||'?')+'] '+(item.started_at||item.created_at||'').slice(0,16).replace('T',' ')+' ('+(item.status||'')+')';
+            sel.appendChild(o);
+        });
+    }).catch(function(){});
+}
+function onHistorySelect(){
+    var v=$('historySelect').value;
+    if(!v)return;
+    $('inputTaskId').value=v;
+    var meta=_historyMap[v]||{};
+    var params=new URLSearchParams(window.location.search);
+    params.set('task_id',v);
+    if(meta.run_id)params.set('run_id',meta.run_id);
+    if(meta.scenario_id)params.set('scenario_id',meta.scenario_id);
+    var sid=$('inputSpaceId').value.trim();
+    if(sid)params.set('space_id',sid);
+    history.replaceState(null,'',window.location.pathname+'?'+params.toString());
+    loadTask();
+}
+function loadTask(){
+    var tid=$('inputTaskId').value.trim();
+    if(!tid){$('loadStatus').textContent='Enter or select Task ID';return;}
+    var sid=$('inputSpaceId').value.trim();
+    state.taskId=tid; state.p2=null;
+    $('taskIdLabel').textContent='task: '+tid.slice(0,8)+'...';
+    $('loadStatus').textContent='loading...';
+    $('p2wait').style.display=''; $('svg2').style.display='none'; $('p2status').textContent='';
+
+    var url='/api/investigation-journal-raw?task_id='+enc(tid);
+    if(sid)url+='&space_id='+enc(sid);
+    fetch(url).then(function(r){return r.json();}).then(function(d){
+        if(d.ok&&d.records&&d.records.length){
+            $('loadStatus').textContent=d.records.length+' records';
+            try{processRecords(d.records);}catch(err){
+                $('loadStatus').textContent='render error: '+err.message;
+                fetch('/api/jserror',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:err.message,stack:err.stack})});
+                return;
+            }
+            runBedrockAndAnalysis();
+        }else{$('loadStatus').textContent='no records'+(d.error?' - '+d.error:'');}
+    }).catch(function(e){$('loadStatus').textContent='error: '+e.message;});
+}
+
+// ================================================================
+// PROCESS RECORDS → DAG MODEL
+// ================================================================
+var ICO={metric:'\ud83d\udcca',trace:'\ud83d\udd17',log:'\ud83d\udccb',code_snippet:'\ud83d\udcdd',change_event:'\ud83d\udd27'};
+var SRC={metric:'Metric',trace:'X-Ray',log:'Log',code_snippet:'Code',change_event:'K8s Event'};
+
+function isCause(f){return f.finding_type==='root_cause'||f.finding_type==='cause';}
+
+function processRecords(records){
+    state.records=records;
+    var alarm=null, observations=[], findings=[], summaryFindings=[], summaryGaps=[], summary=null, messages=[];
+
+    var TYPE_RANK={unknown:0,hypothesis:1,impact:2,cause:3,root_cause:4};
+
+    records.forEach(function(r){
+        var p=r.parsed||tryJ(r.raw_text)||tryJ(r.content);
+        if(!p)return;
+        var type=r.record_type||r.recordType||(p.type)||'';
+        var time=(r.created_at||r.createdAt||'').slice(11,16);
+        var ts=r.created_at||r.createdAt||'';
+
+        if(type==='symptom') alarm={id:p.id||'symptom',title:p.title||'Alarm',time:time,ts:ts,data:p};
+        else if(type==='observation') observations.push({
+            id:p.id||'obs-'+observations.length, title:p.title||'', time:time, ts:ts,
+            activity:p.activity_id||'', signals:p.signals||[], analysis:p.analysis||'', data:p
+        });
+        else if(type==='finding') findings.push({
+            id:p.id||'fin-'+findings.length, title:p.title||'', time:time, ts:ts,
+            finding_type:p.finding_type||'unknown', supporting:p.supporting_observations||[],
+            description:p.description||'', data:p
+        });
+        else if(type==='investigation_summary'){
+            summary={id:'summary',title:'Summary',time:time,ts:ts,data:p,gaps:p.investigation_gaps||[]};
+            summaryFindings=p.findings||[];
+            summaryGaps=p.investigation_gaps||[];
+        }
+        else if(type==='message'){
+            var txt='';
+            if(p.content&&Array.isArray(p.content)&&p.content[0]) txt=p.content[0].text||'';
+            else if(typeof p.content==='string') txt=p.content;
+            if(txt) messages.push({time:time,ts:ts,text:txt});
+        }
+    });
+
+    // Finding dedup: same id → keep highest type rank, union supporting
+    var deduped={};
+    findings.forEach(function(f){
+        var fid=f.id;
+        if(deduped[fid]){
+            var ex=deduped[fid];
+            if((TYPE_RANK[f.finding_type]||0)>(TYPE_RANK[ex.finding_type]||0)){
+                f.supporting=unique(ex.supporting.concat(f.supporting));
+                deduped[fid]=f;
+            }else{
+                ex.supporting=unique(ex.supporting.concat(f.supporting));
+            }
+        }else{deduped[fid]=f;}
+    });
+    findings=Object.values(deduped);
+
+    var model = buildDAGModel(alarm, observations, findings, summaryFindings, summary, messages);
+    state.p1 = model;
+    renderDAG('svg1', model);
+    fitSVG('svg1','area1');
+    $('statusBadge').className='status-badge '+(summary?'complete':'offline');
+    $('statusBadge').textContent=summary?'COMPLETE':'LIVE';
+}
+function unique(arr){var s={};return arr.filter(function(v){if(s[v])return false;s[v]=true;return true;});}
+
+function buildDAGModel(alarm, observations, findings, summaryFindings, summary, messages){
+    var nodes=[], edges=[];
+
+    // --- 1. Alarm node ---
+    var alarmNode = alarm ? {id:'alarm',type:'alarm',label:alarm.title,time:alarm.time,data:alarm.data} : null;
+    if(alarmNode) nodes.push(alarmNode);
+
+    // --- 2. Causal chain from summary.findings[].cascades_to ---
+    var sfMap={};
+    summaryFindings.forEach(function(sf){sfMap[sf.id]=sf;});
+    var cascadeGraph={};
+    summaryFindings.forEach(function(sf){cascadeGraph[sf.id]=sf.cascades_to||[];});
+
+    var rootCauseId=null;
+    summaryFindings.forEach(function(sf){if(sf.type==='root_cause')rootCauseId=sf.id;});
+
+    var chainOrder=[], chainEdges=[], terminatesAtAlarm=false;
+    if(rootCauseId){
+        var cur=rootCauseId, visited={};
+        while(cur&&!visited[cur]){
+            visited[cur]=true;
+            if(sfMap[cur]){
+                chainOrder.push(cur);
+                var targets=cascadeGraph[cur]||[];
+                if(targets.length){
+                    var nxt=targets[0];
+                    if(sfMap[nxt]){
+                        chainEdges.push({from:cur,to:nxt});
+                        cur=nxt;
+                    }else{
+                        chainEdges.push({from:cur,to:'alarm'});
+                        terminatesAtAlarm=true;
+                        break;
+                    }
+                }else break;
+            }else break;
+        }
+    }
+    var chainSet={};
+    chainOrder.forEach(function(id){chainSet[id]=true;});
+
+    // --- 3. Observation nodes (grouped by activity_id) ---
+    var activityGroups={};
+    var obsNodes=[];
+    observations.forEach(function(obs){
+        var obsId='obs_'+obs.id;
+        var target=obs.id.split('-')[0]||'';
+        if(!target||target==='obs') target='데이터 수집';
+        // Resource = signal types
+        var sigTypes={};
+        (obs.signals||[]).forEach(function(s){sigTypes[s.type]=true;});
+        var resource=Object.keys(sigTypes).map(function(t){return SRC[t]||t;}).join(', ')||'';
+        // Evidence = title (short)
+        var evidence=obs.title||obs.analysis||'';
+        if(!evidence&&obs.signals.length>0) evidence=sigInsight(obs.signals[0]);
+
+        var node={id:obsId,type:'observation',target:target,resource:resource,evidence:evidence,
+            time:obs.time,obsId:obs.id,data:obs.data,signals:obs.signals,activity:obs.activity};
+        obsNodes.push(node);
+
+        var act=obs.activity||'unknown';
+        if(!activityGroups[act])activityGroups[act]=[];
+        activityGroups[act].push(node);
+    });
+    nodes=nodes.concat(obsNodes);
+
+    // Alarm → Observation edges
+    if(alarmNode){
+        obsNodes.forEach(function(o){edges.push({from:'alarm',to:o.id,edgeType:'alarm-obs'});});
+    }
+
+    // --- 4. Finding nodes (chain findings + non-chain findings) ---
+    var connectedObs={};
+    findings.forEach(function(fin){
+        var inChain=!!chainSet[fin.id];
+        var res=(fin.data&&fin.data.related_resources)||[];
+        var fTarget=res.length?res.join(', '):(fin.id.split('-')[0]||'');
+        var fEvidence=fin.title||fin.description||'';
+        nodes.push({id:'fin_'+fin.id,type:'finding',label:fin.title,time:fin.time,findingType:fin.finding_type,data:fin.data,description:fin.description,inChain:inChain,chainIndex:inChain?chainOrder.indexOf(fin.id):-1,target:fTarget,evidence:fEvidence});
+        // Obs→Finding edges
+        (fin.supporting||[]).forEach(function(oid){
+            obsNodes.forEach(function(o){
+                if(o.obsId===oid){
+                    edges.push({from:o.id,to:'fin_'+fin.id,edgeType:inChain?'obs-chain-finding':'obs-finding'});
+                    connectedObs[o.id]=true;
+                }
+            });
+        });
+    });
+
+    // --- 5. Finding→Finding causal chain edges (Bedrock 순서대로) ---
+    chainEdges.forEach(function(ce){
+        if(ce.to==='alarm'){
+            edges.push({from:'fin_'+ce.from,to:'alarm',edgeType:'chain-to-alarm'});
+        }else{
+            edges.push({from:'fin_'+ce.from,to:'fin_'+ce.to,edgeType:'chain'});
+        }
+    });
+
+    // --- 6. Orphan observations → individual Terminated nodes ---
+    var orphans=obsNodes.filter(function(o){return !connectedObs[o.id];});
+    orphans.forEach(function(o,i){
+        var tId='term_'+o.id;
+        var reason=o.evidence||o.target||'무관';
+        nodes.push({id:tId,type:'terminated',label:'종료: '+trun(reason,20),time:'',description:'조사했으나 Finding에 연결되지 않음'});
+        o.terminated=true;
+        edges.push({from:o.id,to:tId,edgeType:'orphan'});
+    });
+
+    // --- 7. Message → edge tooltips ---
+    var msgMap={};
+    messages.forEach(function(m){
+        observations.forEach(function(obs){
+            if(obs.ts&&m.ts&&Math.abs(new Date(obs.ts)-new Date(m.ts))<120000){
+                if(!msgMap[obs.id])msgMap[obs.id]=[];
+                msgMap[obs.id].push(m.text);
+            }
+        });
+    });
+
+    return {nodes:nodes,edges:edges,msgMap:msgMap,alarm:alarm,findings:findings,summary:summary,
+        chainOrder:chainOrder,chainSet:chainSet,rootCauseId:rootCauseId,terminatesAtAlarm:terminatesAtAlarm,
+        activityGroups:activityGroups,summaryFindings:summaryFindings};
+}
+
+function sigInsight(sig){
+    if(!sig)return'';
+    if(sig.type==='metric')return sig.title||sig.summary||'metric';
+    if(sig.type==='trace'&&sig.traces){
+        var rec=(sig.traces.records||[])[0];
+        if(rec&&rec.spans){var e=rec.spans.find(function(s){return s.error_message;});if(e)return e.service+'\u2192'+e.operation+': '+e.error_message;}
+        return sig.summary||sig.title||'trace';
+    }
+    if(sig.type==='log'&&sig.logs){var msgs=sig.logs.messages||[];if(msgs.length&&msgs[0].message)return msgs[0].message.replace(/^\[.*?\]\s*/,'');return sig.title||'log';}
+    if(sig.type==='change_event'&&sig.change_event){var d=sig.change_event.details||{};return d.new_env||(d.change_type||'')+' '+(sig.change_event.resource||'');}
+    if(sig.type==='code_snippet'&&sig.code_snippet){var diffs=sig.code_snippet.code_diffs||[];if(diffs.length){var add=(diffs[0].content||'').split('\n').find(function(l){return l.charAt(0)==='+';});return(diffs[0].file_path?(diffs[0].file_path.new||diffs[0].file_path):'')+': '+(add?add.slice(1,60):'');}return sig.title||'code';}
+    return sig.title||sig.summary||'';
+}
+function tryJ(t){try{return JSON.parse(t);}catch(e){return null;}}
+
+// ================================================================
+// DAG RENDERER — Supports vertical (top→bottom) and horizontal (left→right)
+// Toggle via state.layout = 'vertical' | 'horizontal'
+// ================================================================
+var C={
+    NW:220, NH:64,
+    colGap:16,
+    rowGap:50,
+    pad:24,
+    groupPad:10,
+    groupLabelH:16,
+    legendH:80
+};
+
+function toggleLayout(){
+    state.layout=state.layout==='vertical'?'horizontal':'vertical';
+    $('btnLayout').textContent=state.layout==='vertical'?'⇄ 가로':'⇅ 세로';
+    if(state.p1){renderDAG('svg1',state.p1);fitSVG('svg1','area1');}
+    if(state.p2){renderDAG('svg2',state.p2);fitSVG('svg2','area2');}
+}
+
+var _dragCleanup={};
+function renderDAG(svgId, model){
+    var svg=$(svgId); svg.innerHTML='';
+    if(_dragCleanup[svgId]){_dragCleanup[svgId]();_dragCleanup[svgId]=null;}
+    if(!model||!model.nodes.length)return;
+    var isV=state.layout==='vertical';
+
+    var pos={};
+    var actGroups=model.activityGroups||{};
+    var chainOrder=model.chainOrder||[];
+    var alarmNode=model.nodes.find(function(n){return n.type==='alarm';});
+    var chainFindings=model.nodes.filter(function(n){return n.type==='finding'&&n.inChain;});
+    chainFindings.sort(function(a,b){return a.chainIndex-b.chainIndex;});
+    var nonChainFindings=model.nodes.filter(function(n){return n.type==='finding'&&!n.inChain;});
+    var termNodes=model.nodes.filter(function(n){return n.type==='terminated';});
+    var actKeys=Object.keys(actGroups);
+    var groupRects=[];
+
+    // Build orphan lookup: obs id → terminated node id
+    var orphanTermMap={};
+    termNodes.forEach(function(tn){
+        var parentEdge=model.edges.find(function(e){return e.to===tn.id&&e.edgeType==='orphan';});
+        if(parentEdge) orphanTermMap[parentEdge.from]=tn.id;
+    });
+
+    if(isV){
+        // --- VERTICAL: top→bottom ---
+        // Activity groups: side-by-side columns, obs stacked vertically within each group
+        var curY=C.pad;
+        var obsStartY=curY+C.NH+C.rowGap;
+        var obsX=C.pad;
+        var maxObsBottomY=obsStartY;
+        actKeys.forEach(function(act){
+            var obsInGroup=actGroups[act]; if(!obsInGroup||!obsInGroup.length)return;
+            var gy=obsStartY;
+            obsInGroup.forEach(function(o){
+                pos[o.id]={x:obsX,y:gy};
+                gy+=C.NH+6;
+            });
+            if(gy>maxObsBottomY) maxObsBottomY=gy;
+            var gey=gy-6;
+            if(obsInGroup.length>=2) groupRects.push({x:obsX-C.groupPad,y:obsStartY-C.groupLabelH-C.groupPad,w:C.NW+C.groupPad*2,h:gey-obsStartY+C.groupLabelH+C.groupPad*2,label:act.replace(/-/g,' ')});
+            obsX+=C.NW+C.colGap+10;
+        });
+        var totalObsW=obsX-C.colGap-10;
+        var centerX=Math.max(totalObsW/2,C.pad+C.NW/2);
+        // Terminated: directly below their parent obs
+        var termRowY=maxObsBottomY+10;
+        var anyTerm=false;
+        termNodes.forEach(function(tn){
+            var parentId=null;
+            for(var k in orphanTermMap){if(orphanTermMap[k]===tn.id){parentId=k;break;}}
+            var px=parentId&&pos[parentId]?pos[parentId].x:centerX;
+            pos[tn.id]={x:px,y:termRowY};
+            anyTerm=true;
+        });
+        // Chain findings: root cause(step 1) at top → effects downward → alarm at bottom
+        var findStartY=anyTerm?termRowY+C.NH+C.rowGap:maxObsBottomY+C.rowGap;
+        var findY=findStartY;
+        for(var ci=0;ci<chainFindings.length;ci++){pos[chainFindings[ci].id]={x:centerX-C.NW/2,y:findY};findY+=C.NH+C.rowGap;}
+        nonChainFindings.forEach(function(fn,i){pos[fn.id]={x:centerX+C.NW+40,y:findStartY+i*(C.NH+C.rowGap)};});
+        if(alarmNode) pos['alarm']={x:centerX-C.NW/2,y:findY};
+    }else{
+        // --- HORIZONTAL: left→right ---
+        // Same compact strategy as vertical but rotated:
+        //   Col 0: Alarm
+        //   Col 1: Obs — groups side-by-side, obs stacked vertically within each group
+        //   Col 1 (below obs): Terminated nodes under their parent obs
+        //   Col 2..N: Chain findings stacked vertically (reversed: alarm-adjacent at top)
+        var obsStartX=C.pad+C.NW+C.rowGap;
+        var obsY=C.pad;
+        var maxObsBottomY=obsY;
+        actKeys.forEach(function(act){
+            var obsInGroup=actGroups[act]; if(!obsInGroup||!obsInGroup.length)return;
+            var gy=obsY;
+            obsInGroup.forEach(function(o){
+                pos[o.id]={x:obsStartX,y:gy};
+                gy+=C.NH+6;
+            });
+            if(gy>maxObsBottomY) maxObsBottomY=gy;
+            var gey=gy-6;
+            if(obsInGroup.length>=2) groupRects.push({x:obsStartX-C.groupPad,y:obsY-C.groupLabelH-C.groupPad,w:C.NW+C.groupPad*2,h:gey-obsY+C.groupLabelH+C.groupPad*2,label:act.replace(/-/g,' ')});
+            obsY=gy+10;
+        });
+        // Terminated: directly below parent obs in same column
+        var termRowY=maxObsBottomY+10;
+        var anyTerm=false;
+        termNodes.forEach(function(tn){
+            pos[tn.id]={x:obsStartX,y:termRowY};
+            termRowY+=C.NH+8;
+            anyTerm=true;
+        });
+        var totalObsH=Math.max(maxObsBottomY, anyTerm?termRowY:0);
+        var centerY=Math.max(totalObsH/2,C.pad+C.NH/2);
+        // Chain findings: root cause(step 1) at top → effects downward
+        var findStartX=obsStartX+C.NW+C.rowGap;
+        var findY=C.pad;
+        for(var ci=0;ci<chainFindings.length;ci++){pos[chainFindings[ci].id]={x:findStartX,y:findY};findY+=C.NH+C.rowGap;}
+        nonChainFindings.forEach(function(fn,i){pos[fn.id]={x:findStartX+C.NW+40,y:C.pad+i*(C.NH+C.rowGap)};});
+        if(alarmNode) pos['alarm']={x:findStartX+C.NW+C.rowGap,y:centerY-C.NH/2};
+    }
+
+    // Compute total bounds
+    var maxX=0, maxY=0;
+    model.nodes.forEach(function(n){var p=pos[n.id];if(!p)return;if(p.x+C.NW>maxX)maxX=p.x+C.NW;if(p.y+C.NH>maxY)maxY=p.y+C.NH;});
+    var totalW=maxX+C.pad;
+    var totalH=maxY+C.pad+C.legendH;
+    svg.setAttribute('viewBox','0 0 '+totalW+' '+totalH);
+
+    // Defs — arrow markers
+    var defs=svgE('defs');
+    [['arr','#475569'],['arr-chain','#22c55e'],['arr-obs','#60a5fa'],['arr-orphan','#ef4444'],['arr-alarm','#f59e0b']].forEach(function(m){
+        var mk=svgE('marker',{id:m[0]+'-'+svgId,markerWidth:'6',markerHeight:'6',refX:'5',refY:'3',orient:'auto'});
+        mk.appendChild(svgE('path',{d:'M0,0.5 L0,5.5 L6,3 z',fill:m[1]}));defs.appendChild(mk);
+    });
+    svg.appendChild(defs);
+
+    // Background layer (activity groups)
+    var bgG=svgE('g'); svg.appendChild(bgG);
+    var groupColors=['#1e3a5f','#2d1b4e','#1a3636'];
+    groupRects.forEach(function(gr,gi){
+        var gc=groupColors[gi%groupColors.length];
+        bgG.appendChild(svgE('rect',{x:gr.x,y:gr.y,width:gr.w,height:gr.h,rx:'8',fill:gc,stroke:'#60a5fa','stroke-width':'1','stroke-dasharray':'6,3',opacity:'0.5'}));
+        var lt=svgE('text',{x:gr.x+8,y:gr.y+12,'font-size':'9',fill:'#93c5fd','font-weight':'600'});
+        lt.textContent=gr.label; bgG.appendChild(lt);
+    });
+
+    // Layer order: bg → nodes → edges (edges ON TOP of nodes)
+    var nG=svgE('g'); svg.appendChild(nG);
+    var eG=svgE('g'); svg.appendChild(eG);
+
+    // Edge path refs for redraw on drag
+    var edgePaths=[];
+
+    function calcEdgePath(e){
+        var fp=pos[e.from], tp=pos[e.to]; if(!fp||!tp)return null;
+        var et=e.edgeType||'';
+        var x1,y1,x2,y2,d;
+        if(isV){
+            x1=fp.x+C.NW/2; y1=fp.y+C.NH; x2=tp.x+C.NW/2; y2=tp.y;
+            if(et==='chain-to-alarm'){x1=fp.x+C.NW;y1=fp.y+C.NH/2;x2=tp.x+C.NW;y2=tp.y+C.NH/2;var cx=Math.max(x1,x2)+60;d='M '+x1+' '+y1+' C '+cx+' '+y1+', '+cx+' '+y2+', '+x2+' '+y2;}
+            else if(et==='orphan'){d='M '+x1+' '+y1+' L '+x2+' '+y2;}
+            else{var my=(y1+y2)/2;d='M '+x1+' '+y1+' C '+x1+' '+my+', '+x2+' '+my+', '+x2+' '+y2;}
+        }else{
+            x1=fp.x+C.NW; y1=fp.y+C.NH/2; x2=tp.x; y2=tp.y+C.NH/2;
+            if(et==='chain-to-alarm'){y1=fp.y+C.NH;y2=tp.y+C.NH;var cy=Math.max(y1,y2)+60;x1=fp.x+C.NW/2;x2=tp.x+C.NW/2;d='M '+x1+' '+y1+' C '+x1+' '+cy+', '+x2+' '+cy+', '+x2+' '+y2;}
+            else if(et==='orphan'){d='M '+x1+' '+y1+' L '+x2+' '+y2;}
+            else{var mx=(x1+x2)/2;d='M '+x1+' '+y1+' C '+mx+' '+y1+', '+mx+' '+y2+', '+x2+' '+y2;}
+        }
+        return d;
+    }
+
+    // Draw edges
+    model.edges.forEach(function(e){
+        var d=calcEdgePath(e); if(!d)return;
+        var et=e.edgeType||'';
+        var color='#475569', sw=1, dash='', markId='arr';
+        if(et==='chain'){color='#22c55e';sw=2.5;markId='arr-chain';}
+        else if(et==='chain-to-alarm'){color='#f59e0b';sw=2;dash='6,3';markId='arr-alarm';}
+        else if(et==='obs-chain-finding'){color='#22c55e';sw=1.2;markId='arr-chain';}
+        else if(et==='obs-finding'){color='#60a5fa';sw=1;markId='arr-obs';}
+        else if(et==='orphan'){color='#ef4444';sw=1.2;dash='5,3';markId='arr-orphan';}
+        else if(et==='alarm-obs'){color='#334155';sw=0.6;}
+
+        var path=svgE('path',{d:d,fill:'none',stroke:color,'stroke-width':sw,'stroke-dasharray':dash,'marker-end':'url(#'+markId+'-'+svgId+')'});
+        var fromNode=model.nodes.find(function(n){return n.id===e.from;});
+        if(fromNode&&fromNode.obsId&&model.msgMap[fromNode.obsId]){
+            var msgs=model.msgMap[fromNode.obsId];
+            path.style.cursor='help';
+            path.addEventListener('mouseenter',function(ev){showTip(ev,'<div class="tt">Agent reasoning</div>'+msgs.map(function(m){return esc(trun(m,120));}).join('<br>'));});
+            path.addEventListener('mousemove',moveTip);
+            path.addEventListener('mouseleave',hideTip);
+        }
+        eG.appendChild(path);
+        edgePaths.push({edge:e,path:path});
+    });
+
+    function redrawEdges(){
+        edgePaths.forEach(function(ep){
+            var d=calcEdgePath(ep.edge);
+            if(d) ep.path.setAttribute('d',d);
+        });
+    }
+
+    // Draw nodes (BELOW edges in DOM = rendered UNDER edges visually)
+    model.nodes.forEach(function(n){
+        var p=pos[n.id]; if(!p)return;
+        var g=svgE('g',{class:'node','data-id':n.id});
+        var style=nodeStyle(n);
+        g.appendChild(svgE('rect',{x:p.x,y:p.y,width:C.NW,height:C.NH,rx:'6',fill:style.bg,stroke:style.border,'stroke-width':style.sw,'stroke-dasharray':style.dash||''}));
+        if(n.time){var tbg=svgE('text',{x:p.x+C.NW-4,y:p.y+10,'text-anchor':'end','font-size':'7',fill:'#64748b'});tbg.textContent=n.time;g.appendChild(tbg);}
+
+        if(n.type==='observation'){
+            var t1=svgE('text',{x:p.x+8,y:p.y+16,'font-size':'11',fill:'#94a3b8','font-weight':'600'});
+            t1.textContent=trun(n.target||'',26); g.appendChild(t1);
+            var t2=svgE('text',{x:p.x+8,y:p.y+30,'font-size':'9',fill:'#64748b'});
+            t2.textContent=trun(n.resource||'',30); g.appendChild(t2);
+            var t3=svgE('text',{x:p.x+8,y:p.y+44,'font-size':'9',fill:n.terminated?'#64748b':'#e2e8f0'});
+            t3.textContent=trun(n.evidence||'',30); g.appendChild(t3);
+            var badge=n.terminated?'TERMINATED':'OBS';
+            var bt=svgE('text',{x:p.x+8,y:p.y+C.NH-4,'font-size':'7',fill:style.badgeColor||'#64748b','font-weight':'600'});
+            bt.textContent=badge; g.appendChild(bt);
+        }else if(n.type==='finding'){
+            // Line 1: target (service name)
+            var ft=svgE('text',{x:p.x+8,y:p.y+16,'font-size':'11',fill:style.color,'font-weight':'600'});
+            ft.textContent=trun(n.target||'',26); g.appendChild(ft);
+            // Line 2: badge (ROOT CAUSE / CAUSE)
+            var badge='';
+            if(n.inChain&&n.chainIndex===0) badge='ROOT CAUSE';
+            else if(n.inChain) badge='CAUSE';
+            else badge=(n.findingType||'').toUpperCase();
+            var bt=svgE('text',{x:p.x+8,y:p.y+30,'font-size':'9',fill:style.badgeColor||'#64748b','font-weight':'600'});
+            bt.textContent=badge; g.appendChild(bt);
+            // Line 3: evidence (title summary)
+            var fe=svgE('text',{x:p.x+8,y:p.y+44,'font-size':'9',fill:'#e2e8f0'});
+            fe.textContent=trun(n.evidence||'',30); g.appendChild(fe);
+            // Chain number circle
+            if(n.inChain){
+                g.appendChild(svgE('circle',{cx:p.x+C.NW-12,cy:p.y+C.NH-12,r:'10',fill:'#22c55e',opacity:'0.8'}));
+                var ct=svgE('text',{x:p.x+C.NW-12,y:p.y+C.NH-8,'text-anchor':'middle','font-size':'11',fill:'#fff','font-weight':'700'});
+                ct.textContent=String(n.chainIndex+1); g.appendChild(ct);
+            }
+        }else{
+            var lines=wrap(n.label||'',28,2);
+            lines.forEach(function(ln,i){var t=svgE('text',{x:p.x+8,y:p.y+24+i*16,'font-size':'11',fill:style.color,'font-weight':i===0?'600':'400'});t.textContent=ln;g.appendChild(t);});
+            if(n.type==='terminated'){var bt=svgE('text',{x:p.x+8,y:p.y+C.NH-6,'font-size':'8',fill:'#64748b','font-weight':'600'});bt.textContent='DISMISSED';g.appendChild(bt);}
+        }
+
+        var tipHtml='<div class="tt">'+esc(n.evidence||n.label||'')+'</div>';
+        if(n.description)tipHtml+='<div>'+esc(n.description)+'</div>';
+        if(n.target)tipHtml+='<div class="tm">Target: '+esc(n.target)+'</div>';
+        if(n.resource)tipHtml+='<div class="tm">Resource: '+esc(n.resource)+'</div>';
+        if(n.activity)tipHtml+='<div class="tm">Activity: '+esc(n.activity)+'</div>';
+        if(n.signals&&n.signals.length){tipHtml+='<div class="tm">Signals: '+n.signals.map(function(s){return(ICO[s.type]||'')+' '+(s.title||s.type);}).join(', ')+'</div>';}
+        if(n.terminated)tipHtml+='<div class="tm" style="color:#ef4444">조사했으나 Finding에 연결되지 않음 → 종료</div>';
+        if(n.inChain&&n.chainIndex===0)tipHtml+='<div class="tm" style="color:#22c55e">Root Cause</div>';
+        if(n.time)tipHtml+='<div class="tm">'+n.time+'</div>';
+        g.addEventListener('mouseenter',function(ev){showTip(ev,tipHtml);});
+        g.addEventListener('mousemove',moveTip);
+        g.addEventListener('mouseleave',hideTip);
+        if(n.data) g.addEventListener('click',function(){showModal(n);});
+
+        // --- Drag support ---
+        g.style.cursor='grab';
+        g.setAttribute('data-drag-id',n.id);
+        g.setAttribute('data-base-x',String(pos[n.id].x));
+        g.setAttribute('data-base-y',String(pos[n.id].y));
+        g.setAttribute('data-cum-dx','0');
+        g.setAttribute('data-cum-dy','0');
+
+        nG.appendChild(g);
+    });
+
+    // --- Shared drag controller (single handler for all nodes) ---
+    (function(){
+        var active=null, startPt=null, sessDx=0, sessDy=0;
+        function onDown(ev){
+            var g=ev.target.closest('g.node[data-drag-id]');
+            if(!g||ev.button!==0)return;
+            ev.preventDefault();
+            active={
+                group:g,
+                nodeId:g.getAttribute('data-drag-id'),
+                baseX:parseFloat(g.getAttribute('data-base-x')),
+                baseY:parseFloat(g.getAttribute('data-base-y')),
+                cumDx:parseFloat(g.getAttribute('data-cum-dx')),
+                cumDy:parseFloat(g.getAttribute('data-cum-dy'))
+            };
+            sessDx=0; sessDy=0;
+            var pt=svg.createSVGPoint();
+            pt.x=ev.clientX; pt.y=ev.clientY;
+            startPt=pt.matrixTransform(svg.getScreenCTM().inverse());
+            g.style.cursor='grabbing';
+        }
+        function onMove(ev){
+            if(!active)return;
+            hideTip();
+            var pt=svg.createSVGPoint();
+            pt.x=ev.clientX; pt.y=ev.clientY;
+            var cur=pt.matrixTransform(svg.getScreenCTM().inverse());
+            sessDx=cur.x-startPt.x; sessDy=cur.y-startPt.y;
+            var tx=active.cumDx+sessDx, ty=active.cumDy+sessDy;
+            active.group.setAttribute('transform','translate('+tx+','+ty+')');
+            pos[active.nodeId]={x:active.baseX+tx, y:active.baseY+ty};
+            redrawEdges();
+        }
+        function onUp(){
+            if(!active)return;
+            active.group.style.cursor='grab';
+            var newCumDx=active.cumDx+sessDx, newCumDy=active.cumDy+sessDy;
+            active.group.setAttribute('data-cum-dx',String(newCumDx));
+            active.group.setAttribute('data-cum-dy',String(newCumDy));
+            active=null; startPt=null; sessDx=0; sessDy=0;
+        }
+        svg.addEventListener('mousedown',onDown);
+        document.addEventListener('mousemove',onMove);
+        document.addEventListener('mouseup',onUp);
+        _dragCleanup[svgId]=function(){
+            svg.removeEventListener('mousedown',onDown);
+            document.removeEventListener('mousemove',onMove);
+            document.removeEventListener('mouseup',onUp);
+        };
+    })();
+
+    // --- Legend ---
+    drawLegend(svg, C.pad, totalH-C.legendH+5, totalW);
+
+    // --- Auto render report (debug) ---
+    var reportNodes=model.nodes.map(function(n){return{id:n.id,type:n.type,target:n.target||'',resource:n.resource||'',evidence:(n.evidence||'').slice(0,40),label:(n.label||'').slice(0,40)};});
+    var reportEdges=model.edges.map(function(e){return{from:e.from,to:e.to,edgeType:e.edgeType};});
+    fetch('/api/render-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        phase:svgId==='svg1'?1:2, layout:state.layout, nodes:reportNodes, edges:reportEdges, positions:pos
+    })}).catch(function(){});
+}
+
+function drawLegend(svg, x, y, totalW){
+    var lg=svgE('g');
+    lg.appendChild(svgE('line',{x1:x,y1:y-4,x2:totalW-C.pad,y2:y-4,stroke:'#334155','stroke-width':'0.5'}));
+    var items=[
+        {color:'#22c55e',dash:'',label:'인과 체인 (Finding→Finding)',sw:2.5},
+        {color:'#22c55e',dash:'',label:'근거 연결 (Obs→Finding)',sw:1.2},
+        {color:'#f59e0b',dash:'6,3',label:'체인→알람 귀결',sw:2},
+        {color:'#ef4444',dash:'5,3',label:'종료 (기각/무관)',sw:1.2},
+        {color:'#60a5fa',dash:'',label:'비체인 연결',sw:1}
+    ];
+    var cx=x;
+    items.forEach(function(it){
+        lg.appendChild(svgE('line',{x1:cx,y1:y+10,x2:cx+28,y2:y+10,stroke:it.color,'stroke-width':it.sw,'stroke-dasharray':it.dash||'none'}));
+        var t=svgE('text',{x:cx+32,y:y+14,'font-size':'9',fill:'#94a3b8'});t.textContent=it.label;lg.appendChild(t);
+        cx+=120;
+    });
+    var ny=y+30;
+    var nodeItems=[
+        {bg:'#172554',border:'#38bdf8',sw:2.5,label:'Alarm'},
+        {bg:'#0c1a2e',border:'#60a5fa',sw:1.5,label:'Observation'},
+        {bg:'#14532d',border:'#4ade80',sw:3,label:'Root Cause'},
+        {bg:'#0a2e1a',border:'#22c55e',sw:2,label:'Cause'},
+        {bg:'#1c1917',border:'#ef4444',sw:1.5,dash:'5,3',label:'종료'}
+    ];
+    var nx=x;
+    nodeItems.forEach(function(it){
+        lg.appendChild(svgE('rect',{x:nx,y:ny,width:16,height:12,rx:2,fill:it.bg,stroke:it.border,'stroke-width':it.sw,'stroke-dasharray':it.dash||''}));
+        var t=svgE('text',{x:nx+20,y:ny+10,'font-size':'9',fill:'#94a3b8'});t.textContent=it.label;lg.appendChild(t);
+        nx+=110;
+    });
+    svg.appendChild(lg);
+}
+
+function nodeStyle(n){
+    switch(n.type){
+        case 'alarm': return{bg:'#172554',border:'#38bdf8',sw:2.5,color:'#7dd3fc',fontSize:'12'};
+        case 'observation':
+            if(n.terminated) return{bg:'#1c1917',border:'#a8a29e',sw:1.2,dash:'4,3',color:'#d6d3d1',badgeColor:'#a8a29e'};
+            return{bg:'#0c1a2e',border:'#60a5fa',sw:1.5,color:'#e2e8f0',badgeColor:'#60a5fa'};
+        case 'finding':
+            if(n.inChain&&n.chainIndex===0) return{bg:'#14532d',border:'#4ade80',sw:3,color:'#bbf7d0',badgeColor:'#4ade80',fontSize:'11'};
+            if(n.inChain) return{bg:'#0a2e1a',border:'#22c55e',sw:2,color:'#86efac',badgeColor:'#22c55e'};
+            return{bg:'#1e1b4b',border:'#818cf8',sw:1.5,color:'#c7d2fe',badgeColor:'#818cf8'};
+        case 'terminated': return{bg:'#1c1917',border:'#ef4444',sw:1.5,dash:'5,3',color:'#fca5a5',badgeColor:'#ef4444',fontSize:'11'};
+        default: return{bg:'#1e293b',border:'#475569',sw:1,color:'#e2e8f0'};
+    }
+}
+
+// ================================================================
+// FIT TO VIEW
+// ================================================================
+function fitSVG(svgId,areaId){
+    var svg=$(svgId);if(!svg)return;
+    svg.style.width='100%'; svg.style.height='100%';
+    svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+}
+function fitView(){fitSVG('svg1','area1');if(state.p2)fitSVG('svg2','area2');}
+
+// ================================================================
+// BEDROCK (Phase 2)
+// ================================================================
+function runBedrock(){
+    if(!state.p1){$('loadStatus').textContent='Load data first';return;}
+    runBedrockAndAnalysis();
+}
+
+function runBedrockAndAnalysis(){
+    if(!state.p1)return;
+    $('btnBedrock').textContent='analyzing...';
+    $('p2status').textContent='analyzing...';
+
+    var sid=$('inputSpaceId').value.trim();
+    var url='/api/investigation-journal?task_id='+enc(state.taskId);
+    if(sid)url+='&space_id='+enc(sid);
+
+    fetch(url).then(function(r){return r.json();}).then(function(d){
+        $('btnBedrock').textContent='Bedrock';
+        if(d.ok){
+            $('p2status').textContent='done';
+            applyBedrock(d);
+            renderAnalysisFromBedrock(d);
+        }else{
+            $('p2status').textContent='failed: '+(d.error||'');
+            renderAnalysisFromBedrock(null);
+        }
+    }).catch(function(e){
+        $('btnBedrock').textContent='Bedrock';
+        $('p2status').textContent='error: '+e.message;
+        renderAnalysisFromBedrock(null);
+    });
+}
+
+function applyBedrock(br){
+    var alarm=state.p1.alarm;
+    var nodes=[], edges=[];
+
+    // --- 1. Alarm node ---
+    var alarmNode=alarm?{id:'alarm',type:'alarm',label:alarm.title,time:alarm.time,data:alarm.data}:null;
+    if(alarmNode)nodes.push(alarmNode);
+
+    // --- 2. Bedrock causal chain (step-by-step) ---
+    var brChain=br.causal_chain||[];
+    var chainOrder=[], chainSet={};
+    brChain.forEach(function(c,i){
+        var fid='brchain_'+i;
+        chainOrder.push(fid);
+        chainSet[fid]=true;
+        nodes.push({id:fid,type:'finding',label:c.event,time:'',findingType:i===0?'root_cause':'cause',
+            inChain:true,chainIndex:i,data:c,description:'['+c.service+'] '+c.event,
+            target:c.service||'',evidence:c.event||''});
+    });
+    // Chain edges: chain[0]→chain[1]→...→alarm (Bedrock 반환 순서대로)
+    for(var ci=0;ci<chainOrder.length-1;ci++){
+        edges.push({from:chainOrder[ci],to:chainOrder[ci+1],edgeType:'chain'});
+    }
+    // Last chain → alarm
+    if(chainOrder.length&&alarmNode){
+        edges.push({from:chainOrder[chainOrder.length-1],to:'alarm',edgeType:'chain-to-alarm'});
+    }
+
+    // --- 3. Observations from hypotheses (grouped by hypothesis) ---
+    var obsNodes=[], seenObs={};
+    var connectedObs={};
+    var activityGroups={};
+
+    (br.hypotheses||[]).forEach(function(hyp){
+        var groupKey=hyp.label||hyp.id;
+        var groupNodes=[];
+
+        (hyp.steps||[]).forEach(function(step,si){
+            var oid=step.obs_id||('step_'+hyp.id+'_'+si);
+            var nodeId='obs_'+oid;
+            if(!seenObs[oid]){
+                seenObs[oid]=true;
+                var stepTarget=oid.split('-')[0]||'';
+                if(!stepTarget||stepTarget==='obs'||stepTarget==='step') stepTarget=step.service||'데이터 수집';
+                var stepResource=SRC[step.signal_type]||step.signal_type||'';
+                var stepEvidence=step.insight||oid;
+                var obsNode={id:nodeId,type:'observation',target:stepTarget,resource:stepResource,evidence:stepEvidence,
+                    time:'',obsId:oid,data:null,activity:groupKey,signals:[],hypStatus:hyp.status};
+                if(hyp.status==='rejected') obsNode.terminated=true;
+                obsNodes.push(obsNode);
+                groupNodes.push(obsNode);
+                if(alarmNode)edges.push({from:'alarm',to:nodeId,edgeType:'alarm-obs'});
+            }
+        });
+
+        // Obs→Finding edges: hypothesis.findings → match to chain findings
+        if(hyp.findings&&hyp.findings.length&&hyp.status==='confirmed'){
+            (hyp.steps||[]).forEach(function(step,si){
+                var oid=step.obs_id||('step_'+hyp.id+'_'+si);
+                var nodeId='obs_'+oid;
+                (hyp.findings||[]).forEach(function(fid){
+                    // Match finding id to chain node
+                    var target=null;
+                    // First try Phase 1 findings in chain
+                    chainOrder.forEach(function(cid){
+                        var cn=nodes.find(function(n){return n.id===cid;});
+                        if(!cn)return;
+                        if(cn.description&&cn.description.indexOf(fid)>=0) target=cid;
+                    });
+                    // Fallback: find by Phase 1 finding id
+                    if(!target){
+                        var p1fins=state.p1.findings||[];
+                        p1fins.forEach(function(pf){
+                            if(pf.id===fid){
+                                chainOrder.forEach(function(cid,ci){
+                                    var cn=nodes.find(function(n){return n.id===cid;});
+                                    if(cn&&pf.supporting){
+                                        pf.supporting.forEach(function(soid){
+                                            if(oid===soid&&!target) target=cid;
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    if(target){
+                        edges.push({from:nodeId,to:target,edgeType:'obs-chain-finding'});
+                        connectedObs[nodeId]=true;
+                    }
+                });
+            });
+        }
+
+        if(groupNodes.length) activityGroups[groupKey]=groupNodes;
+    });
+    nodes=nodes.concat(obsNodes);
+
+    // --- 4. Individual terminated nodes for rejected hypothesis obs ---
+    var orphans=obsNodes.filter(function(o){return !connectedObs[o.id];});
+    orphans.forEach(function(o,i){
+        var tId='term_'+o.id;
+        var reason=o.label||o.activity||'기각';
+        nodes.push({id:tId,type:'terminated',label:'종료: '+trun(reason,20),time:'',description:'기각된 가설의 관찰'});
+        o.terminated=true;
+        edges.push({from:o.id,to:tId,edgeType:'orphan'});
+    });
+
+    state.p2={nodes:nodes,edges:edges,msgMap:{},alarm:alarm,findings:state.p1.findings,summary:state.p1.summary,
+        chainOrder:chainOrder,chainSet:chainSet,rootCauseId:chainOrder[0]||null,terminatesAtAlarm:true,
+        activityGroups:activityGroups,summaryFindings:[]};
+    $('p2wait').style.display='none';
+    $('svg2').style.display='';
+    renderDAG('svg2',state.p2);
+    fitSVG('svg2','area2');
+}
+
+// ================================================================
+// MODAL
+// ================================================================
+function showModal(n){
+    $('modalTitle').textContent=n.label||'Detail';
+    var h='<div class="meta">';
+    if(n.time)h+='<strong>Time:</strong> '+n.time+'<br>';
+    if(n.type)h+='<strong>Type:</strong> '+n.type+'<br>';
+    if(n.findingType)h+='<strong>Finding:</strong> '+n.findingType+'<br>';
+    h+='</div>';
+    if(n.description)h+='<div class="insight-box">'+esc(n.description)+'</div>';
+    var data=n.data;
+    if(data){
+        if(data.analysis)h+='<div class="insight-box">'+esc(data.analysis)+'</div>';
+        if(data.signals)(data.signals||[]).forEach(function(sig){h+='<div class="signal-card"><div class="st">'+(ICO[sig.type]||'')+' '+sig.type+(sig.title?' \u2014 '+sig.title:'')+'</div><div class="sb">'+esc(fmtSig(sig))+'</div></div>';});
+    }
+    $('modalBody').innerHTML=h;
+    $('modalOverlay').classList.add('open');
+}
+function fmtSig(sig){
+    if(sig.type==='metric'&&sig.datasets){var b='';(sig.datasets.metricDataset||[]).forEach(function(d){b+=d.label+':\n';(d.data||[]).forEach(function(p){b+='  '+(p.x?new Date(p.x*1000).toISOString().slice(11,16):'?')+' \u2192 '+p.y+'\n';});});return b;}
+    if(sig.type==='trace'&&sig.traces){var b='';(sig.traces.records||[]).forEach(function(t){b+='Trace: '+t.trace_id+' ('+t.duration_ms+'ms '+t.status+')\n';(t.spans||[]).forEach(function(s){b+='  '+s.service+' \u2192 '+s.operation+' '+s.duration_ms+'ms'+(s.error_message?' \u274c '+s.error_message:'')+'\n';});});return b;}
+    if(sig.type==='log'&&sig.logs)return(sig.logs.messages||[]).map(function(m){return(m.timestamp||'')+' '+(m.message||'');}).join('\n');
+    if(sig.type==='change_event'&&sig.change_event){var c=sig.change_event,b='Resource: '+(c.resource||'')+'\n';if(c.details)Object.keys(c.details).forEach(function(k){b+=k+': '+c.details[k]+'\n';});return b;}
+    if(sig.type==='code_snippet'&&sig.code_snippet){var cs=sig.code_snippet,b='';(cs.code_diffs||[]).forEach(function(d){b+=(d.file_path?(d.file_path.new||d.file_path):'')+'\n'+(d.content||'')+'\n';});return b;}
+    return JSON.stringify(sig,null,2).slice(0,400);
+}
+
+// ================================================================
+// TOOLTIP
+// ================================================================
+function showTip(e,html){var t=$('tooltip');t.innerHTML=html;t.style.display='block';moveTip(e);}
+function moveTip(e){var t=$('tooltip');t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-10)+'px';}
+function hideTip(){$('tooltip').style.display='none';}
+
+// ================================================================
+// UTILS
+// ================================================================
+function $(id){return document.getElementById(id);}
+function enc(s){return encodeURIComponent(s);}
+function svgE(t,a){var e=document.createElementNS('http://www.w3.org/2000/svg',t);if(a)for(var k in a)e.setAttribute(k,a[k]);return e;}
+function trun(s,n){if(!s)return'';return s.length>n?s.slice(0,n)+'\u2026':s;}
+function wrap(text,maxC,maxL){
+    if(!text)return[''];
+    text=String(text).replace(/\n/g,' ').trim();
+    if(text.length<=maxC)return[text];
+    var result=[],rem=text;
+    for(var i=0;i<maxL&&rem.length>0;i++){
+        if(rem.length<=maxC){result.push(rem);break;}
+        var cut=rem.lastIndexOf(' ',maxC);if(cut<maxC*0.3)cut=maxC;
+        var line=rem.slice(0,cut);rem=rem.slice(cut).trim();
+        if(i===maxL-1&&rem.length>0)line=line.slice(0,maxC-1)+'\u2026';
+        result.push(line);
+    }
+    return result.length?result:[''];
+}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')$('modalOverlay').classList.remove('open');});
+
+// ================================================================
+// ANALYSIS: Hypothesis + Rubric
+// ================================================================
+function renderAnalysisFromBedrock(hypResult){
+    var params=new URLSearchParams(window.location.search);
+    var runId=params.get('run_id')||'';
+    var scenarioId=params.get('scenario_id')||'';
+    var sid=$('inputSpaceId').value.trim();
+    var tid=state.taskId;
+
+    $('analysisSection').style.display='';
+
+    // 가설 분석 (Bedrock 결과 재사용)
+    var hasHyp=hypResult&&hypResult.ok&&hypResult.hypotheses&&hypResult.hypotheses.length>0;
+    if(hasHyp){
+        renderHypotheses(hypResult,$('hypSection'));
+    }else{
+        var hypMsg=hypResult&&hypResult.error?esc(hypResult.error):'가설 데이터 없음';
+        $('hypSection').innerHTML='<div class="scen-analysis-title">가설 분석</div><div style="color:#64748b;font-size:.62rem;padding:16px;text-align:center">'+hypMsg+'</div>';
+    }
+
+    // Rubric 평가 (task_id + scenario_id로 호출)
+    if(!scenarioId){
+        $('rubSection').innerHTML='<div class="scen-analysis-title">RUBRIC 평가</div><div style="color:#64748b;font-size:.62rem;padding:16px;text-align:center">시나리오 연결 없음 (수동 조사는 rubric 평가 불가)</div>';
+        return;
+    }
+    var evalId=runId||'_';
+    fetch('/api/evaluate/'+enc(evalId),{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({task_id:tid,scenario_id:scenarioId,space_id:sid})
+    }).then(function(r){return r.json();}).then(function(rubResult){
+        if(rubResult&&rubResult.criteria_results){
+            renderRubric(rubResult,$('rubSection'));
+        }else{
+            $('rubSection').innerHTML='<div class="scen-analysis-title">RUBRIC 평가</div><div style="color:#64748b;font-size:.62rem;padding:16px;text-align:center">'+(rubResult&&rubResult.error?esc(rubResult.error):'Rubric 평가 데이터 없음')+'</div>';
+        }
+    }).catch(function(e){
+        $('rubSection').innerHTML='<div class="scen-analysis-title">RUBRIC 평가</div><div style="color:#fca5a5;font-size:.62rem;padding:16px">평가 로드 오류: '+esc(String(e))+'</div>';
+    });
+}
+
+function renderHypotheses(data, el) {
+    var SC = {rejected: 'rgba(239,68,68,0.12)', partial: 'rgba(245,158,11,0.10)', confirmed: 'rgba(34,197,94,0.10)'};
+    var SB = {rejected: '#ef4444', partial: '#f59e0b', confirmed: '#22c55e'};
+    var SBD = {rejected: 'rgba(239,68,68,0.2)', partial: 'rgba(245,158,11,0.2)', confirmed: 'rgba(34,197,94,0.2)'};
+    var ST = {rejected: '기각', partial: '부분 확인', confirmed: '확인'};
+    var DI = {'metric': '&#128202;', 'log': '&#128221;', 'trace': '&#128269;', 'code_snippet': '&#128187;', 'change_event': '&#128640;',
+              '메트릭': '&#128202;', '로그': '&#128221;', '트레이스': '&#128269;', 'K8s': '&#9784;&#65039;', '코드': '&#128187;', '배포이력': '&#128640;'};
+
+    var h = '<div class="scen-analysis-title">가설 분석</div>';
+
+    if (data.alarm) {
+        h += '<div class="scen-hyp-alarm">';
+        h += '&#128276; 알람 인지: ' + esc(data.alarm) + '</div>';
+    }
+
+    (data.hypotheses || []).forEach(function(hy, hi) {
+        var s = hy.status || 'partial';
+        var bg = SC[s] || 'rgba(30,41,59,0.5)';
+        var bd = SB[s] || '#334155';
+        var bdd = SBD[s] || 'rgba(51,65,85,0.3)';
+        var lb = ST[s] || s;
+        var uid = 'dagHyp-' + hi;
+        var hypTitle = hy.label || hy.title || ('가설 ' + (hi + 1));
+
+        h += '<div class="scen-hyp-card" style="border-color:' + bdd + '">';
+        h += '<div class="scen-hyp-header" style="background:' + bg + '" onclick="var e=document.getElementById(\'' + uid + '\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'">';
+        h += '<span class="scen-hyp-num" style="background:' + bg + ';border-color:' + bdd + ';color:' + bd + '">' + (hi + 1) + '</span>';
+        h += '<span class="scen-hyp-title">' + esc(hypTitle) + '</span>';
+        if (hy.category) h += '<span class="scen-hyp-tag">' + esc(hy.category) + '</span>';
+        h += '<span class="scen-hyp-status" style="color:' + bd + ';border-color:' + bdd + '">' + lb + '</span>';
+        if (hy.leads_to) h += '<span class="scen-hyp-link">&rarr; 가설' + hy.leads_to + '</span>';
+        h += '</div>';
+
+        h += '<div id="' + uid + '">';
+        (hy.steps || []).forEach(function(st) {
+            var src = st.data_source || st.signal_type || '';
+            var di = DI[src] || '&#128203;';
+            var tm = (st.source_times || []).join(', ');
+            var actionText = st.action || st.insight || '';
+            h += '<div class="scen-hyp-step' + (st.is_key ? ' key' : '') + '">';
+            h += '<div class="scen-hyp-step-meta">';
+            if (tm) h += '<span class="scen-hyp-step-time">' + esc(tm) + '</span>';
+            h += '<span class="scen-hyp-step-icon">' + di + '</span>';
+            if (src) h += '<span class="scen-hyp-step-src">' + esc(src) + '</span>';
+            if (st.is_key) h += '<span class="scen-hyp-step-key">&#11088; 핵심</span>';
+            h += '</div>';
+            if (actionText) h += '<div class="scen-hyp-step-text">' + esc(actionText) + '</div>';
+            h += '</div>';
+        });
+        var reasonText = hy.status_reason || hy.reason || '';
+        if (reasonText) h += '<div class="scen-hyp-reason" style="color:' + bd + '">' + esc(reasonText) + '</div>';
+        h += '</div></div>';
+    });
+
+    if (data.root_cause) {
+        var rc = data.root_cause;
+        var rcTitle = rc.title || rc.summary || '';
+        var rcDesc = rc.description || rc.summary || '';
+        h += '<div class="scen-hyp-rootcause">';
+        h += '<div class="scen-hyp-rootcause-title">&#127919; Root Cause</div>';
+        if (rcTitle) h += '<div class="scen-hyp-rootcause-name">' + esc(rcTitle) + '</div>';
+        if (rcDesc && rcDesc !== rcTitle) h += '<div class="scen-hyp-rootcause-desc">' + esc(rcDesc) + '</div>';
+        h += '</div>';
+    }
+
+    h += '<div class="scen-hyp-footer">DevOps Agent API + Bedrock | 원본 ' + (data.raw_count || 0) + '건</div>';
+    el.innerHTML = h;
+}
+
+function renderRubric(data, el) {
+    var h = '<div class="scen-analysis-title">Rubric 평가</div>';
+    h += '<div class="scen-rub-summary">';
+    h += '<div class="scen-rub-score">' + data.overall_score + ' <span class="scen-rub-score-max">/ ' + data.max_score + '</span></div>';
+    h += '<div class="scen-rub-meta">모델: ' + esc(data.model || '') + ' | 메시지: ' + (data.message_count || 0) + '건</div>';
+    h += '</div>';
+
+    var criteria = data.criteria_results || {};
+    var keys = Object.keys(criteria);
+
+    if (keys.length >= 3) {
+        var n = keys.length, cx = 120, cy = 120, R = 90;
+        var scores = keys.map(function(k){return Number(criteria[k].score) || 0});
+        var labels = keys.map(function(k){return k.replace(/_/g, ' ')});
+        function rpt(i, r){var a = (Math.PI * 2 * i / n) - Math.PI / 2; return [cx + r * Math.cos(a), cy + r * Math.sin(a)];}
+        var svg = '<svg viewBox="0 0 240 240" style="width:100%;max-width:220px;height:220px">';
+        [2, 4, 6, 8, 10].forEach(function(v){
+            var pts = []; for (var i = 0; i < n; i++) pts.push(rpt(i, R * v / 10).join(','));
+            svg += '<polygon points="' + pts.join(' ') + '" fill="none" stroke="#334155" stroke-width="0.5"/>';
+        });
+        for (var i = 0; i < n; i++){var p = rpt(i, R); svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '" stroke="#334155" stroke-width="0.5"/>';}
+        var dp = []; for (var i = 0; i < n; i++) dp.push(rpt(i, R * scores[i] / 10).join(','));
+        svg += '<polygon points="' + dp.join(' ') + '" fill="rgba(59,130,246,0.25)" stroke="#3b82f6" stroke-width="2"/>';
+        for (var i = 0; i < n; i++){var p = rpt(i, R * scores[i] / 10); var c = scores[i] >= 7 ? '#22c55e' : scores[i] >= 4 ? '#fbbf24' : '#ef4444'; svg += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4" fill="' + c + '" stroke="#0f172a" stroke-width="1"/>';}
+        for (var i = 0; i < n; i++){var p = rpt(i, R + 20); var anc = p[0] < cx - 10 ? 'end' : p[0] > cx + 10 ? 'start' : 'middle'; svg += '<text x="' + p[0] + '" y="' + p[1] + '" text-anchor="' + anc + '" fill="#94a3b8" font-size="7" dominant-baseline="middle">' + esc(labels[i]) + '</text>'; svg += '<text x="' + p[0] + '" y="' + (p[1] + 10) + '" text-anchor="' + anc + '" fill="' + (scores[i] >= 7 ? '#22c55e' : scores[i] >= 4 ? '#fbbf24' : '#ef4444') + '" font-size="8" font-weight="bold" dominant-baseline="middle">' + scores[i] + '</text>';}
+        svg += '</svg>';
+        h += '<div style="text-align:center;margin-bottom:10px">' + svg + '</div>';
+    }
+
+    for (var ki = 0; ki < keys.length; ki++) {
+        var id = keys[ki];
+        var c = criteria[id];
+        var score = Number(c.score) || 0;
+        var pct = Math.round(score * 10);
+        var color = score >= 7 ? '#22c55e' : score >= 4 ? '#fbbf24' : '#ef4444';
+        h += '<div class="scen-rub-item" style="border-left-color:' + color + '">';
+        h += '<div class="scen-rub-item-hdr">';
+        h += '<span class="scen-rub-item-name">' + esc(id) + ' <span class="scen-rub-item-weight">(가중치 ' + c.weight + ')</span></span>';
+        h += '<span class="scen-rub-item-score" style="color:' + color + '">' + c.score + '/10</span>';
+        h += '</div>';
+        h += '<div class="scen-rub-bar"><div class="scen-rub-bar-fill" style="background:' + color + ';width:' + pct + '%"></div></div>';
+        h += '<div class="scen-rub-item-criteria">' + esc(c.criteria || '') + '</div>';
+        h += '<div class="scen-rub-item-reason">' + esc(c.reasoning || '') + '</div>';
+        h += '</div>';
+    }
+
+    el.innerHTML = h;
+}
+
+// ================================================================
+// INIT
+// ================================================================
+(function(){
+    var sid=$('inputSpaceId').value.trim();
+    fetch('/api/agent-space-info?space_id='+enc(sid))
+        .then(function(r){return r.json();}).then(function(d){
+            $('loadStatus').textContent=d.ok?'Agent Space: '+d.message:'Agent Space: '+(d.error||'failed');
+        }).catch(function(){$('loadStatus').textContent='Agent Space offline';});
+})();
+loadHistory();
+
+var urlTid=new URLSearchParams(window.location.search).get('task_id');
+var urlSid=new URLSearchParams(window.location.search).get('space_id');
+if(urlSid)$('inputSpaceId').value=urlSid;
+if(urlTid){$('inputTaskId').value=urlTid;loadTask();}
+</script>
+</body>
+</html>

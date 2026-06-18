@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80px" height="80px" viewBox="0 0 80 80" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Icon-Architecture/64/Arch_AWS-IAM_64</title>
+    <g id="Icon-Architecture/64/Arch_AWS-IAM_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Icon-Architecture-BG/64/Security-Identity-Compliance" fill="#DD344C">
+            <rect id="Rectangle" x="0" y="0" width="80" height="80"></rect>
+        </g>
+        <g id="Icon-Service/64/IAM" transform="translate(16, 16)" fill="#FFFFFF">
+            <!-- Person -->
+            <circle cx="24" cy="12" r="6"/>
+            <path d="M14,30 C14,22 18,18 24,18 C30,18 34,22 34,30 L14,30 Z"/>
+            <!-- Key -->
+            <circle cx="38" cy="36" r="5" fill="none" stroke="#FFFFFF" stroke-width="2.5"/>
+            <line x1="33" y1="36" x2="16" y2="36" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="20" y1="36" x2="20" y2="41" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="25" y1="36" x2="25" y2="41" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+            <!-- Gear -->
+            <circle cx="10" cy="36" r="4" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+            <circle cx="10" cy="36" r="1.5"/>
+        </g>
+    </g>
+</svg>

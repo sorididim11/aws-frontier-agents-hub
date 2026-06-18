@@ -1,0 +1,186 @@
+{
+    "id": "A01-oom",
+    "name": "Memory Leak → OOMKilled",
+    "category": "single-service",
+    "layer": "Application → Resource",
+    "purpose": "코드 내 메모리 릭(캐시 미해제)으로 인한 점진적 메모리 증가 → OOMKilled 감지. DevOps Agent가 코드 분석으로 버그를 찾아낼 수 있는지 검증.",
+    "architecture": {
+        "components": [
+            {
+                "id": "worker",
+                "label": "Worker",
+                "type": "app",
+                "desc": "작업 처리 서비스"
+            },
+            {
+                "id": "hasher",
+                "label": "Hasher",
+                "type": "app",
+                "desc": "해시 계산 (메모리 릭)"
+            },
+            {
+                "id": "cw",
+                "label": "CloudWatch",
+                "type": "aws",
+                "desc": "Pod 재시작 알람"
+            },
+            {
+                "id": "agent",
+                "label": "DevOps Agent",
+                "type": "agent",
+                "desc": "코드 분석 + 조사"
+            }
+        ],
+        "edges": [
+            {
+                "from": "worker",
+                "to": "hasher",
+                "label": "POST /"
+            },
+            {
+                "from": "hasher",
+                "to": "cw",
+                "label": "OOMKilled"
+            },
+            {
+                "from": "cw",
+                "to": "agent",
+                "label": "알람"
+            }
+        ],
+        "fault_path": [
+            "hasher",
+            "cw",
+            "agent"
+        ]
+    },
+    "flow": [
+        "캐시 모드를 aggressive로 설정",
+        "매 요청마다 해시 결과를 버퍼에 저장 (해제 없음)",
+        "메모리 점진적 증가 (요청당 256KB)",
+        "128Mi 한계 초과 → OOMKilled",
+        "Pod 재시작 → CloudWatch 알람",
+        "DevOps Agent 코드 분석으로 버퍼 증가 버그 발견"
+    ],
+    "normal_flow": [
+        {
+            "step": "Worker → Hasher",
+            "desc": "Worker가 랜덤 데이터를 Hasher에 전달 (POST /)"
+        },
+        {
+            "step": "Hasher 해시 계산",
+            "desc": "SHA256 해시 계산 후 결과 반환 (메모리 사용 일정)"
+        },
+        {
+            "step": "Worker → Redis",
+            "desc": "해시 결과 저장"
+        }
+    ],
+    "fault_flow": [
+        {
+            "step": "🔴 캐시 모드 변경",
+            "desc": "aggressive 캐시 모드 활성화 → 매 요청마다 _result_buffer에 256KB 추가"
+        },
+        {
+            "step": "메모리 증가",
+            "desc": "요청 처리할 때마다 버퍼 eviction 없이 메모리 무한 증가"
+        },
+        {
+            "step": "🔴 OOMKilled",
+            "desc": "128Mi 한계 초과 → 컨테이너 OOMKilled → Pod 재시작"
+        },
+        {
+            "step": "CloudWatch 알람",
+            "desc": "hasher-oomkilled 알람 트리거"
+        },
+        {
+            "step": "앱 → DevOps Agent",
+            "desc": "webhook으로 조사 시작 요청"
+        }
+    ],
+    "investigation_goal": "DevOps Agent가 OOMKilled를 감지하고, 코드 분석을 통해 hasher.py의 _result_buffer가 eviction 없이 무한 증가하는 버그를 찾아내야 함.",
+    "expected_root_cause": "Root Cause: hasher.py의 _result_buffer 무한 증가 - 캐시 eviction 없이 무한 증가 (코드 버그)",
+    "trigger": {
+        "type": "kubectl",
+        "command": "kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/cache?mode=aggressive&size=256')\""
+    },
+    "pre_cleanup": {
+        "command": "kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/cache?mode=normal')\" && kubectl exec -n dockercoins deployment/rng -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/response?quality=normal')\"",
+        "reset_alarms": [
+            "${PROJECT_NAME}-hasher-oomkilled"
+        ],
+        "wait_ok_timeout": 60
+    },
+    "restore": {
+        "command": "kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/cache?mode=normal')\""
+    },
+    "verification": {
+        "steps": [
+            {
+                "name": "메모리 릭 활성화 확인",
+                "type": "pod_logs",
+                "pod": "hasher",
+                "pattern": "POST.*200",
+                "timeout": 30,
+                "poll_interval": 5
+            },
+            {
+                "name": "Pod OOMKilled 확인",
+                "type": "pod_status",
+                "pod": "hasher",
+                "expected": "OOMKilled",
+                "timeout": 300,
+                "poll_interval": 15
+            },
+            {
+                "name": "OOMKilled 알람 확인",
+                "type": "cw_alarm",
+                "alarm": "${PROJECT_NAME}-hasher-oomkilled",
+                "expected": "ALARM",
+                "timeout": 300,
+                "poll_interval": 15
+            },
+            {
+                "name": "DevOps Agent 조사 시작",
+                "type": "investigation_event",
+                "expected_status": "IN_PROGRESS",
+                "timeout": 600,
+                "poll_interval": 15
+            },
+            {
+                "name": "DevOps Agent 조사 완료",
+                "type": "investigation_event",
+                "expected_status": "COMPLETED",
+                "timeout": 1200,
+                "poll_interval": 30
+            }
+        ]
+    },
+    "evaluation_rubric": {
+        "root_cause_match": {
+            "weight": 30,
+            "criteria": "근본 원인이 hasher의 캐시 버퍼 무한 증가(eviction 없음)를 정확히 식별했는가"
+        },
+        "code_analysis": {
+            "weight": 25,
+            "criteria": "hasher.py 소스코드를 분석하고 파일 경로/라인 번호를 참조했는가"
+        },
+        "data_sources": {
+            "weight": 20,
+            "required": [
+                "K8s",
+                "CloudWatch",
+                "Code"
+            ],
+            "criteria": "K8s pod 상태(OOMKilled, 재시작), CloudWatch 메트릭, 코드 분석을 모두 활용했는가"
+        },
+        "causal_chain": {
+            "weight": 15,
+            "criteria": "캐시 증가 → 메모리 초과 → OOMKilled → Pod 재시작 인과관계를 설명했는가"
+        },
+        "false_leads": {
+            "weight": 10,
+            "criteria": "잘못된 방향(인프라 문제, 설정 문제 등)에 시간을 낭비하지 않았는가"
+        }
+    }
+}

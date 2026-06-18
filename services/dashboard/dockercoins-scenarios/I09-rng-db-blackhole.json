@@ -1,0 +1,99 @@
+{
+    "id": "I09-rng-db-blackhole",
+    "name": "RNG→DB Port Blackhole (FIS)",
+    "category": "aws",
+    "layer": "AWS → FIS Pod Network Fault",
+    "purpose": "FIS aws:eks:pod-network-blackhole-port로 rng pod의 port 5432 egress 차단 → DB 연결 실패. 네트워크는 정상이지만 특정 포트만 차단되어 Agent가 정확한 구간을 식별해야 함",
+    "expected_root_cause": "FIS Experiment (aws:eks:pod-network-blackhole-port) - rng pod에서 port 5432 egress 차단 (DB 연결 불가)",
+    "investigation_goal": "DevOps Agent가 RDS 자체는 정상이고, rng pod에서 DB 포트로의 egress가 차단됨을 식별. CloudTrail FIS 실험 이력으로 근본 원인 확인",
+    "normal_flow": [
+        { "step": "RNG → RDS", "desc": "rng 서비스가 RDS (port 5432)에서 랜덤 시드 조회" },
+        { "step": "RNG 응답", "desc": "GET / 요청에 랜덤 바이트 반환 (~50ms)" },
+        { "step": "Worker 정상 처리", "desc": "Worker → RNG 호출 정상" }
+    ],
+    "fault_flow": [
+        { "step": "🔴 FIS blackhole 시작", "desc": "rng pod에서 port 5432 egress 차단" },
+        { "step": "RNG DB 연결 실패 → 에러 급증", "desc": "rng → RDS 연결 타임아웃 → 500 에러 반환 → worker 재시도 루프" },
+        { "step": "알람 트리거", "desc": "rng-high-latency 알람 트리거" },
+        { "step": "DevOps Agent 조사", "desc": "RDS 정상 확인 → rng pod 네트워크 확인 → CloudTrail FIS 확인" }
+    ],
+    "trigger": {
+        "type": "aws_cli",
+        "command": "ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/${PROJECT_NAME}-fis-role && LOG_ARN=arn:aws:logs:${AWS_REGION}:${AWS_ACCOUNT_ID}:log-group:/aws/fis/${PROJECT_NAME}:* && TMPL_ID=$(aws fis create-experiment-template --description 'rng pod port 5432 egress blackhole' --role-arn $ROLE_ARN --stop-conditions source=none --targets '{\"RngPods\":{\"resourceType\":\"aws:eks:pod\",\"selectionMode\":\"ALL\",\"parameters\":{\"clusterIdentifier\":\"${PROJECT_NAME}-cluster\",\"namespace\":\"dockercoins\",\"selectorType\":\"labelSelector\",\"selectorValue\":\"app=rng\"}}}' --actions '{\"BlackholeDbPort\":{\"actionId\":\"aws:eks:pod-network-blackhole-port\",\"parameters\":{\"duration\":\"PT5M\",\"port\":\"5432\",\"protocol\":\"tcp\",\"trafficType\":\"egress\",\"kubernetesServiceAccount\":\"fis-sa\"},\"targets\":{\"Pods\":\"RngPods\"}}}' --log-configuration '{\"cloudWatchLogsConfiguration\":{\"logGroupArn\":\"'$LOG_ARN'\"},\"logSchemaVersion\":2}' --tags Name=${PROJECT_NAME}-rng-db-blackhole-cli --region ${AWS_REGION} --no-cli-pager --query experimentTemplate.id --output text 2>&1) && EXP_ID=$(aws fis start-experiment --experiment-template-id $TMPL_ID --region ${AWS_REGION} --no-cli-pager --query experiment.id --output text 2>&1) && echo \"FIS experiment: $EXP_ID template: $TMPL_ID\""
+    },
+    "restore": {
+        "command": "echo 'FIS experiment auto-stops after PT5M. Cleaning up templates...' && for t in $(aws fis list-experiment-templates --region ${AWS_REGION} --no-cli-pager --query \"experimentTemplates[?tags.Name=='${PROJECT_NAME}-rng-db-blackhole-cli'].id\" --output text 2>/dev/null); do aws fis delete-experiment-template --id $t --region ${AWS_REGION} --no-cli-pager 2>/dev/null; echo \"Deleted template: $t\"; done"
+    },
+    "pre_cleanup": {
+        "command": "for t in $(aws fis list-experiment-templates --region ${AWS_REGION} --no-cli-pager --query \"experimentTemplates[?tags.Name=='${PROJECT_NAME}-rng-db-blackhole-cli'].id\" --output text 2>/dev/null); do aws fis delete-experiment-template --id $t --region ${AWS_REGION} --no-cli-pager 2>/dev/null; done && echo 'pre-cleanup done'",
+        "reset_alarms": [
+            "${PROJECT_NAME}-rng-high-latency"
+        ],
+        "wait_ok_timeout": 60
+    },
+    "verification": {
+        "steps": [
+            {
+                "name": "FIS 실험 실행 확인",
+                "type": "fis_experiment",
+                "expected_status": "running",
+                "timeout": 90,
+                "poll_interval": 5
+            },
+            {
+                "name": "RNG DB 연결 에러 (로그)",
+                "type": "pod_logs",
+                "pod": "rng",
+                "pattern": "connection|timeout|refused|error|500",
+                "tail": 30,
+                "timeout": 120,
+                "poll_interval": 10
+            },
+            {
+                "name": "CW 알람 트리거",
+                "type": "cw_alarm",
+                "alarm": "${PROJECT_NAME}-rng-high-latency",
+                "expected": "ALARM",
+                "timeout": 300,
+                "poll_interval": 15
+            },
+            {
+                "name": "DevOps Agent 조사 시작",
+                "type": "investigation_event",
+                "expected_status": "IN_PROGRESS",
+                "timeout": 120,
+                "poll_interval": 10
+            },
+            {
+                "name": "DevOps Agent 조사 완료",
+                "type": "investigation_event",
+                "expected_status": "COMPLETED",
+                "timeout": 600,
+                "poll_interval": 30
+            }
+        ]
+    },
+    "evaluation_rubric": {
+        "root_cause_match": {
+            "weight": 35,
+            "criteria": "근본 원인이 RDS 장애가 아닌 FIS pod-network-blackhole-port (port 5432 egress 차단)임을 식별했는가"
+        },
+        "data_sources": {
+            "weight": 25,
+            "required": ["CloudTrail", "CloudWatch", "RDS", "Logs"],
+            "criteria": "RDS 상태 정상 확인, rng pod 로그에서 DB 연결 실패 확인, CloudTrail FIS 이력 확인"
+        },
+        "causal_chain": {
+            "weight": 20,
+            "criteria": "FIS blackhole → rng port 5432 차단 → DB 쿼리 실패 → rng 500 에러 → worker 장애 인과관계"
+        },
+        "false_leads": {
+            "weight": 15,
+            "criteria": "RDS 장애, SG 변경, 네트워크 전체 장애로 잘못 추적하지 않았는가"
+        },
+        "code_analysis": {
+            "weight": 5,
+            "criteria": "FIS 실험의 대상(rng pod), 차단 포트(5432), 방향(egress)을 정확히 확인했는가"
+        }
+    }
+}

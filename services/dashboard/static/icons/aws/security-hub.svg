@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80px" height="80px" viewBox="0 0 80 80" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Icon-Architecture/64/Arch_AWS-Security-Hub_64</title>
+    <g id="Icon-Architecture/64/Arch_AWS-Security-Hub_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Icon-Architecture-BG/64/Security-Identity-Compliance" fill="#DD344C">
+            <rect id="Rectangle" x="0" y="0" width="80" height="80"></rect>
+        </g>
+        <g id="Icon-Service/64/Security-Hub" transform="translate(16, 12)" fill="#FFFFFF">
+            <path d="M24,4 L8,11 L8,27 C8,37.5 15,46 24,50 C33,46 40,37.5 40,27 L40,11 L24,4 Z M24,7 L37,12.5 L37,27 C37,36 31,43.5 24,47 C17,43.5 11,36 11,27 L11,12.5 L24,7 Z"/>
+            <path d="M24,12 L14,16.5 L14,27 C14,34.5 19,40.5 24,43 C29,40.5 34,34.5 34,27 L34,16.5 L24,12 Z" fill-opacity="0.4"/>
+            <polyline points="19,27 22.5,31 30,22" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+    </g>
+</svg>

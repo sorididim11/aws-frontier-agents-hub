@@ -1,0 +1,120 @@
+{
+  "id": "A02-latency",
+  "name": "Cascading Latency",
+  "category": "single-service",
+  "layer": "Application → Performance",
+  "purpose": "POST 핸들러에 지연 주입 → worker 전체 파이프라인 cascading 지연 → 알람 트리거",
+  "normal_flow": [
+    {
+      "step": "Worker → Hasher",
+      "desc": "Worker가 랜덤 데이터를 Hasher에 전달 (POST /, ~100ms)"
+    },
+    {
+      "step": "Hasher 해시 계산",
+      "desc": "SHA256 해시 계산 후 결과 반환"
+    },
+    {
+      "step": "Worker → Redis",
+      "desc": "해시 결과 저장"
+    }
+  ],
+  "fault_flow": [
+    {
+      "step": "🔴 지연 주입",
+      "desc": "/inject-latency?seconds=5 → 모든 POST 요청에 5초 지연 추가"
+    },
+    {
+      "step": "Worker 파이프라인 지연",
+      "desc": "Worker → Hasher 요청마다 5초+ 소요 → 전체 처리량 급감"
+    },
+    {
+      "step": "X-Ray 고지연 Trace",
+      "desc": "Hasher 서비스 응답시간 5초+ 기록"
+    },
+    {
+      "step": "CloudWatch 알람",
+      "desc": "hasher-high-latency 알람 트리거"
+    },
+    {
+      "step": "앱 → DevOps Agent",
+      "desc": "webhook으로 조사 시작 요청"
+    }
+  ],
+  "investigation_goal": "DevOps Agent가 Hasher 서비스의 비정상적 지연을 감지하고, 지연 원인을 분석해야 함.",
+  "expected_root_cause": "Performance Issue - hasher 서비스 지연으로 인한 cascading latency",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl exec -n dockercoins deployment/worker -- wget -q -O- http://hasher/inject-latency?seconds=5 --timeout=10"
+  },
+  "pre_cleanup": {
+    "command": "kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/clear-latency')\" && kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/cache?mode=normal')\" && kubectl exec -n dockercoins deployment/rng -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/response?quality=normal')\"",
+    "reset_alarms": [
+      "${PROJECT_NAME}-hasher-high-latency"
+    ],
+    "wait_ok_timeout": 60
+  },
+  "restore": {
+    "command": "kubectl exec -n dockercoins deployment/worker -- wget -q -O- http://hasher/clear-latency --timeout=10"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "X-Ray 고지연 Trace",
+        "type": "xray_trace",
+        "filter": "service(\"hasher\") AND responsetime > 3",
+        "minutes": 10,
+        "timeout": 180,
+        "poll_interval": 15
+      },
+      {
+        "name": "CW Latency 알람",
+        "type": "cw_alarm",
+        "alarm": "${PROJECT_NAME}-hasher-high-latency",
+        "expected": "ALARM",
+        "timeout": 300,
+        "poll_interval": 15
+      },
+      {
+        "name": "DevOps Agent 조사 시작",
+        "type": "investigation_event",
+        "expected_status": "IN_PROGRESS",
+        "timeout": 600,
+        "poll_interval": 15
+      },
+      {
+        "name": "DevOps Agent 조사 완료",
+        "type": "investigation_event",
+        "expected_status": "COMPLETED",
+        "timeout": 1200,
+        "poll_interval": 30
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 hasher 서비스의 응답 지연(latency injection)임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "X-Ray",
+        "CloudWatch",
+        "Logs"
+      ],
+      "criteria": "X-Ray 트레이스, CloudWatch 지연 메트릭, 애플리케이션 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "hasher 지연 → worker 파이프라인 cascading 지연 → 처리량 감소 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향(네트워크, 인프라 등)에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "hasher.py의 지연 주입 코드 경로를 분석했는가"
+    }
+  }
+}

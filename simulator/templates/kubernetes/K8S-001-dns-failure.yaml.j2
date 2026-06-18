@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: {{ scenario_id }}
+  namespace: kube-system
+  labels:
+    simulator.chaos/scenario: "{{ scenario_id }}"
+    simulator.chaos/category: "kubernetes"
+    simulator.chaos/template: "K8S-001"
+spec:
+  action: pod-failure
+  mode: all
+  selector:
+    namespaces:
+      - kube-system
+    labelSelectors:
+      k8s-app: "kube-dns"
+  duration: "{{ duration | default('3m') }}"

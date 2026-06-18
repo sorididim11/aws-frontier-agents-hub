@@ -1,0 +1,99 @@
+{
+    "id": "I08-hasher-network-latency",
+    "name": "Hasher Network Latency (FIS Pod-Level)",
+    "category": "aws",
+    "layer": "AWS → FIS Pod Network Fault",
+    "purpose": "FIS aws:eks:pod-network-latency로 hasher pod에 3초 네트워크 지연 주입 → cascading latency. A02(앱 레벨 /inject-latency)와 증상 동일하지만 원인이 다름 - Agent가 CloudTrail FIS 이력에서 근본 원인을 찾아야 함",
+    "expected_root_cause": "FIS Experiment (aws:eks:pod-network-latency) - hasher pod 전체 네트워크에 3000ms 지연 주입 (애플리케이션 코드 아님)",
+    "investigation_goal": "DevOps Agent가 hasher 코드에 문제가 없음을 확인하고, CloudTrail에서 FIS StartExperiment 이벤트를 찾아 pod-network-latency가 근본 원인임을 식별",
+    "normal_flow": [
+        { "step": "Worker → Hasher", "desc": "Worker가 hasher에 POST 요청, ~100ms 응답" },
+        { "step": "Hash 계산", "desc": "SHA256 해시 계산 후 반환" },
+        { "step": "정상 처리량", "desc": "초당 200건 이상 처리" }
+    ],
+    "fault_flow": [
+        { "step": "🔴 FIS 실험 시작", "desc": "hasher pod에 aws:eks:pod-network-latency 3000ms 주입" },
+        { "step": "Hasher 응답 지연 → Worker 처리량 감소", "desc": "hasher RTT ~6s (ingress+egress 각 3초) → worker 처리량 급감" },
+        { "step": "알람 트리거", "desc": "hasher-network-latency 알람 트리거 (worker→hasher 클라이언트 지연)" },
+        { "step": "DevOps Agent 조사", "desc": "hasher 코드 확인 → 문제 없음 → CloudTrail FIS StartExperiment 확인" }
+    ],
+    "trigger": {
+        "type": "aws_cli",
+        "command": "ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/${PROJECT_NAME}-fis-role && LOG_ARN=arn:aws:logs:${AWS_REGION}:${AWS_ACCOUNT_ID}:log-group:/aws/fis/${PROJECT_NAME}:* && TMPL_ID=$(aws fis create-experiment-template --description 'hasher pod network latency 3000ms' --role-arn $ROLE_ARN --stop-conditions source=none --targets '{\"HasherPods\":{\"resourceType\":\"aws:eks:pod\",\"selectionMode\":\"ALL\",\"parameters\":{\"clusterIdentifier\":\"${PROJECT_NAME}-cluster\",\"namespace\":\"dockercoins\",\"selectorType\":\"labelSelector\",\"selectorValue\":\"app=hasher\"}}}' --actions '{\"InjectLatency\":{\"actionId\":\"aws:eks:pod-network-latency\",\"parameters\":{\"duration\":\"PT5M\",\"delayMilliseconds\":\"3000\",\"jitterMilliseconds\":\"100\",\"kubernetesServiceAccount\":\"fis-sa\",\"sources\":\"ALL\"},\"targets\":{\"Pods\":\"HasherPods\"}}}' --log-configuration '{\"cloudWatchLogsConfiguration\":{\"logGroupArn\":\"'$LOG_ARN'\"},\"logSchemaVersion\":2}' --tags Name=${PROJECT_NAME}-hasher-latency-cli --region ${AWS_REGION} --no-cli-pager --query experimentTemplate.id --output text 2>&1) && EXP_ID=$(aws fis start-experiment --experiment-template-id $TMPL_ID --region ${AWS_REGION} --no-cli-pager --query experiment.id --output text 2>&1) && echo \"FIS experiment: $EXP_ID template: $TMPL_ID\""
+    },
+    "restore": {
+        "command": "kubectl patch deployment hasher -n dockercoins --type=json -p '[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds\",\"value\":1},{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds\",\"value\":1},{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/readinessProbe/failureThreshold\",\"value\":3},{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/livenessProbe/failureThreshold\",\"value\":3}]' && echo 'Probe restored' && for t in $(aws fis list-experiment-templates --region ${AWS_REGION} --no-cli-pager --query \"experimentTemplates[?tags.Name=='${PROJECT_NAME}-hasher-latency-cli'].id\" --output text 2>/dev/null); do aws fis delete-experiment-template --id $t --region ${AWS_REGION} --no-cli-pager 2>/dev/null; echo \"Deleted template: $t\"; done"
+    },
+    "pre_cleanup": {
+        "command": "for t in $(aws fis list-experiment-templates --region ${AWS_REGION} --no-cli-pager --query \"experimentTemplates[?tags.Name=='${PROJECT_NAME}-hasher-latency-cli'].id\" --output text 2>/dev/null); do aws fis delete-experiment-template --id $t --region ${AWS_REGION} --no-cli-pager 2>/dev/null; done && kubectl patch deployment hasher -n dockercoins --type=json -p '[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds\",\"value\":15},{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds\",\"value\":15},{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/readinessProbe/failureThreshold\",\"value\":10},{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/livenessProbe/failureThreshold\",\"value\":10}]' && kubectl rollout restart deployment/hasher -n dockercoins && kubectl rollout status deployment/hasher -n dockercoins --timeout=90s && echo 'pre-cleanup done'",
+        "reset_alarms": [
+            "${PROJECT_NAME}-hasher-network-latency"
+        ],
+        "wait_ok_timeout": 60
+    },
+    "verification": {
+        "steps": [
+            {
+                "name": "FIS 실험 실행 확인",
+                "type": "fis_experiment",
+                "expected_status": "running",
+                "timeout": 90,
+                "poll_interval": 5
+            },
+            {
+                "name": "Hasher 응답 지연 → Worker 처리량 감소",
+                "type": "pod_logs",
+                "pod": "worker",
+                "pattern": "units of work done",
+                "tail": 10,
+                "timeout": 120,
+                "poll_interval": 10
+            },
+            {
+                "name": "알람 트리거",
+                "type": "cw_alarm",
+                "alarm": "${PROJECT_NAME}-hasher-network-latency",
+                "expected": "ALARM",
+                "timeout": 300,
+                "poll_interval": 15
+            },
+            {
+                "name": "DevOps Agent 조사 시작",
+                "type": "investigation_event",
+                "expected_status": "IN_PROGRESS",
+                "timeout": 120,
+                "poll_interval": 10
+            },
+            {
+                "name": "DevOps Agent 조사 완료",
+                "type": "investigation_event",
+                "expected_status": "COMPLETED",
+                "timeout": 600,
+                "poll_interval": 30
+            }
+        ]
+    },
+    "evaluation_rubric": {
+        "root_cause_match": {
+            "weight": 35,
+            "criteria": "근본 원인이 hasher /inject-latency API 호출이 아닌 FIS 실험(aws:eks:pod-network-latency)임을 정확히 식별했는가"
+        },
+        "data_sources": {
+            "weight": 25,
+            "required": ["CloudTrail", "CloudWatch", "Logs"],
+            "criteria": "CloudTrail에서 FIS StartExperiment 이벤트 발견, hasher 로그에서 /inject-latency 호출 없음 확인"
+        },
+        "causal_chain": {
+            "weight": 20,
+            "criteria": "FIS pod-network-latency → hasher 네트워크 지연 → worker cascading 지연 → 처리량 감소 인과관계"
+        },
+        "false_leads": {
+            "weight": 15,
+            "criteria": "hasher /inject-latency API 호출이나 코드 버그로 잘못 추적하지 않았는가"
+        },
+        "code_analysis": {
+            "weight": 5,
+            "criteria": "FIS 실험 ID, 시작 시간, 대상 pod selector가 장애 시점/대상과 일치함을 확인했는가"
+        }
+    }
+}

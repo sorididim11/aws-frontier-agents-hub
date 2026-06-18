@@ -1,0 +1,54 @@
+{
+  "id": "SEC-f-c4b079",
+  "devops_space_id": "7e86205f-79ea-4992-b1f3-eb5d24a1a439",
+  "name": "Cross-Tenant IDOR in Scenario Management API via space_id Parameter",
+  "description": "The `/api/scenario-improvements/accept` endpoint is completely unauthenticated and accepts any user-supplied `space_id` parameter in the JSON request body. The server processes write operations (prompt_rules addition and script_fix updates) and returns success confirmations including accurate `rules_added` counts and `script_updated` boolean values. However, due to DynamoDB being inaccessible (AWS STS AccessDenied on all read operations), it is impossible to verify that writes to different space_ids actually result in access to different tenant-specific backend objects. All space_ids—including clearly fabricated ones like \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"—produce identical 200 OK responses with generic processing confirmations. The responses do not contain any object-level data (owner fields, tenant-specific content, or distinct resource identifiers) that would prove different backend objects are being selected based on the space_id parameter. While the endpoint is clearly unauthenticated and processes the space_id parameter (real input validation occurs—numbers crash the server, strings are iterated, arrays are counted), the cross-tenant aspect of the IDOR cannot be verified without a working read-back mechanism to confirm data isolation breach.",
+  "category": "security-OverviewApp",
+  "app_name": "OverviewApp",
+  "layer": "app",
+  "target_service": "OverviewApp",
+  "failure_mode": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "INSECURE_DIRECT_OBJECT_REFERENCE 취약점 — Cross-Tenant IDOR in Scenario Management API via space_id Parameter",
+  "source": "security-agent",
+  "finding_id": "f-c4b07918-7231-4db6-bb61-41287d64af44",
+  "risk_level": "MEDIUM",
+  "risk_type": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "endpoint": "",
+  "attack_steps": [
+    {
+      "method": "POST",
+      "path": "/api/scenario-improvements/accept",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "target",
+      "label": "/api/scenario-improvements/accept"
+    }
+  ],
+  "registered_at": "2026-06-09T10:51:40.796085+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: INSECURE_DIRECT_OBJECT_REFERENCE on \n# Endpoint: /api/scenario-improvements/accept"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "INSECURE_DIRECT_OBJECT_REFERENCE 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

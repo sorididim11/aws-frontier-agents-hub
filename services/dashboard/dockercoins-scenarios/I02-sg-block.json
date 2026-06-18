@@ -1,0 +1,133 @@
+{
+  "id": "I02-sg-block",
+  "name": "Security Group Block",
+  "category": "aws",
+  "layer": "AWS → Network",
+  "purpose": "DB Security Group에서 EKS 노드 CIDR 인바운드 규칙 제거 → RNG 서비스 DB 연결 실패 → 알람 트리거",
+  "expected_root_cause": "Security Group - ${PROJECT_NAME}-db-sg에서 EKS 노드 서브넷 인바운드 규칙 제거로 인한 RNG DB 연결 차단",
+  "investigation_goal": "DevOps Agent가 CloudTrail에서 SG 규칙 변경 이력을 발견하고 근본 원인을 식별할 수 있는가",
+  "normal_flow": [
+    {
+      "step": "RNG → RDS",
+      "desc": "rng 서비스가 PostgreSQL DB에 정상 연결"
+    },
+    {
+      "step": "DB 쿼리",
+      "desc": "랜덤 데이터 생성 후 DB 저장"
+    },
+    {
+      "step": "응답 반환",
+      "desc": "worker에게 정상 응답"
+    }
+  ],
+  "fault_flow": [
+    {
+      "step": "🔴 SG 규칙 제거",
+      "desc": "${PROJECT_NAME}-db-sg에서 10.0.11.0/24 인바운드 제거"
+    },
+    {
+      "step": "DB 연결 차단",
+      "desc": "EKS 노드에서 RDS 5432 포트 접근 불가"
+    },
+    {
+      "step": "RNG 연결 실패",
+      "desc": "rng pod에서 DB 연결 타임아웃 에러"
+    },
+    {
+      "step": "에러 급증",
+      "desc": "X-Ray에 에러 trace 기록"
+    },
+    {
+      "step": "알람 트리거",
+      "desc": "hasher-errors 알람 트리거 (rng 에러로 인한 연쇄)"
+    },
+    {
+      "step": "DevOps Agent",
+      "desc": "webhook으로 조사 시작"
+    }
+  ],
+  "trigger": {
+    "type": "aws_cli",
+    "command": "SG_ID=$(aws ec2 describe-security-groups --filters 'Name=group-name,Values=${PROJECT_NAME}-db-sg' --query 'SecurityGroups[0].GroupId' --output text --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null) && aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 5432 --cidr 10.0.11.0/24 --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null; aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 5432 --cidr 10.0.12.0/24 --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null; echo 'SG rule removed'"
+  },
+  "restore": {
+    "command": "SG_ID=$(aws ec2 describe-security-groups --filters 'Name=group-name,Values=${PROJECT_NAME}-db-sg' --query 'SecurityGroups[0].GroupId' --output text --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null) && aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 5432 --cidr 10.0.11.0/24 --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null; aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 5432 --cidr 10.0.12.0/24 --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null; echo 'SG rule restored'"
+  },
+  "pre_cleanup": {
+    "command": "SG_ID=$(aws ec2 describe-security-groups --filters 'Name=group-name,Values=${PROJECT_NAME}-db-sg' --query 'SecurityGroups[0].GroupId' --output text --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null) && aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 5432 --cidr 10.0.11.0/24 --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null; aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 5432 --cidr 10.0.12.0/24 --region ${AWS_REGION:-us-east-1} --no-cli-pager 2>/dev/null; echo 'pre-cleanup done'",
+    "reset_alarms": [
+      "${PROJECT_NAME}-hasher-errors"
+    ],
+    "wait_ok_timeout": 60
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "RNG DB 연결 에러 확인",
+        "type": "pod_logs",
+        "pod": "rng",
+        "pattern": "connection|timeout|error|Error|refused",
+        "tail": 30,
+        "timeout": 60,
+        "poll_interval": 10
+      },
+      {
+        "name": "X-Ray 에러 Trace",
+        "type": "xray_trace",
+        "filter": "service(\"rng\") AND error = true",
+        "minutes": 10,
+        "timeout": 180,
+        "poll_interval": 15
+      },
+      {
+        "name": "CW 알람 확인",
+        "type": "cw_alarm",
+        "alarm": "${PROJECT_NAME}-hasher-errors",
+        "expected": "ALARM",
+        "timeout": 300,
+        "poll_interval": 15
+      },
+      {
+        "name": "DevOps Agent 조사 시작",
+        "type": "investigation_event",
+        "expected_status": "IN_PROGRESS",
+        "timeout": 120,
+        "poll_interval": 10
+      },
+      {
+        "name": "DevOps Agent 조사 완료",
+        "type": "investigation_event",
+        "expected_status": "COMPLETED",
+        "timeout": 600,
+        "poll_interval": 30
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 Security Group 규칙 제거로 인한 DB 연결 차단임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "CloudTrail",
+        "CloudWatch",
+        "K8s"
+      ],
+      "criteria": "CloudTrail에서 SG 규칙 변경 이력, 연결 실패 로그, 메트릭을 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "SG 규칙 제거 → DB 연결 차단 → RNG 에러 → 서비스 장애 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "애플리케이션 코드 버그나 다른 원인으로 잘못 추적하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "CloudTrail에서 SG 변경 API 호출(RevokeSecurityGroupIngress)을 발견했는가"
+    }
+  }
+}

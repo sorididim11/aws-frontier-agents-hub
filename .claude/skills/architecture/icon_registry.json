@@ -1,0 +1,142 @@
+{
+  "_description": "Icon lookup table mapping cloud/platform service names to draw.io shape identifiers. Shared by generator (SKILL.md) and verifier (verify_drawio.py).",
+
+  "providers": {
+    "aws": {
+      "style_marker": "mxgraph.aws4",
+      "icon_base": "shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.{service}",
+      "services": {
+        "cloudwatch":       {"fill": "#E7157B", "category": "management"},
+        "sns":              {"fill": "#E7157B", "category": "management"},
+        "sqs":              {"fill": "#E7157B", "category": "management"},
+        "eventbridge":      {"fill": "#E7157B", "category": "management"},
+        "cloudformation":   {"fill": "#E7157B", "category": "management"},
+        "step_functions":   {"fill": "#E7157B", "category": "management"},
+        "api_gateway":      {"fill": "#E7157B", "category": "management"},
+        "cloudtrail":       {"fill": "#E7157B", "category": "management"},
+        "config":           {"fill": "#E7157B", "category": "management"},
+        "devops_agent":     {"fill": "#E7157B", "category": "management"},
+        "systems_manager":  {"fill": "#E7157B", "category": "management"},
+
+        "lambda":           {"fill": "#ED7100", "category": "compute"},
+        "eks":              {"fill": "#ED7100", "category": "compute"},
+        "ecs":              {"fill": "#ED7100", "category": "compute"},
+        "fargate":          {"fill": "#ED7100", "category": "compute"},
+        "ec2":              {"fill": "#ED7100", "category": "compute"},
+        "ecr":              {"fill": "#ED7100", "category": "compute"},
+        "app_runner":       {"fill": "#ED7100", "category": "compute"},
+        "batch":            {"fill": "#ED7100", "category": "compute"},
+        "fis":              {"fill": "#ED7100", "category": "compute"},
+
+        "rds":              {"fill": "#C925D1", "category": "database"},
+        "dynamodb":         {"fill": "#C925D1", "category": "database"},
+        "aurora":           {"fill": "#C925D1", "category": "database"},
+        "elasticache":      {"fill": "#C925D1", "category": "database"},
+        "redshift":         {"fill": "#C925D1", "category": "database"},
+        "documentdb":       {"fill": "#C925D1", "category": "database"},
+        "timestream":       {"fill": "#C925D1", "category": "database"},
+
+        "bedrock":          {"fill": "#01A88D", "category": "ai_ml"},
+        "sagemaker":        {"fill": "#01A88D", "category": "ai_ml"},
+        "comprehend":       {"fill": "#01A88D", "category": "ai_ml"},
+        "rekognition":      {"fill": "#01A88D", "category": "ai_ml"},
+
+        "secrets_manager":  {"fill": "#DD344C", "category": "security"},
+        "iam":              {"fill": "#DD344C", "category": "security"},
+        "cognito":          {"fill": "#DD344C", "category": "security"},
+        "kms":              {"fill": "#DD344C", "category": "security"},
+        "waf":              {"fill": "#DD344C", "category": "security"},
+        "guardduty":        {"fill": "#DD344C", "category": "security"},
+
+        "alb":              {"fill": "#8C4FFF", "category": "networking", "override_style": "shape=mxgraph.aws4.application_load_balancer"},
+        "nlb":              {"fill": "#8C4FFF", "category": "networking", "override_style": "shape=mxgraph.aws4.network_load_balancer"},
+        "cloudfront":       {"fill": "#8C4FFF", "category": "networking"},
+        "route53":          {"fill": "#8C4FFF", "category": "networking"},
+        "vpc":              {"fill": "#8C4FFF", "category": "networking"},
+        "transit_gateway":  {"fill": "#8C4FFF", "category": "networking"},
+        "direct_connect":   {"fill": "#8C4FFF", "category": "networking"},
+
+        "s3":               {"fill": "#3F8624", "category": "storage"},
+        "efs":              {"fill": "#3F8624", "category": "storage"},
+        "ebs":              {"fill": "#3F8624", "category": "storage"},
+
+        "kinesis":          {"fill": "#8C4FFF", "category": "analytics"},
+        "athena":           {"fill": "#8C4FFF", "category": "analytics"},
+        "glue":             {"fill": "#8C4FFF", "category": "analytics"},
+        "opensearch":       {"fill": "#8C4FFF", "category": "analytics"},
+        "xray":             {"fill": "#8C4FFF", "category": "analytics"}
+      }
+    },
+
+    "gcp": {
+      "style_marker": "mxgraph.gcp2",
+      "icon_base": "shape=mxgraph.gcp2.{service}",
+      "services": {
+        "cloud_run":        {"fill": "#4285F4", "category": "compute"},
+        "gke":              {"fill": "#4285F4", "category": "compute"},
+        "cloud_functions":  {"fill": "#4285F4", "category": "compute"},
+        "cloud_sql":        {"fill": "#4285F4", "category": "database"},
+        "firestore":        {"fill": "#4285F4", "category": "database"},
+        "bigquery":         {"fill": "#4285F4", "category": "analytics"},
+        "pubsub":           {"fill": "#4285F4", "category": "management"},
+        "cloud_storage":    {"fill": "#4285F4", "category": "storage"}
+      }
+    },
+
+    "azure": {
+      "style_marker": "mxgraph.azure",
+      "icon_base": "shape=mxgraph.azure.{service}",
+      "services": {
+        "aks":              {"fill": "#0078D4", "category": "compute"},
+        "functions":        {"fill": "#0078D4", "category": "compute"},
+        "app_service":      {"fill": "#0078D4", "category": "compute"},
+        "cosmos_db":        {"fill": "#0078D4", "category": "database"},
+        "sql_database":     {"fill": "#0078D4", "category": "database"},
+        "blob_storage":     {"fill": "#0078D4", "category": "storage"},
+        "event_grid":       {"fill": "#0078D4", "category": "management"},
+        "service_bus":      {"fill": "#0078D4", "category": "management"}
+      }
+    }
+  },
+
+  "kubernetes": {
+    "style_marker": "mxgraph.kubernetes",
+    "fill": "#326CE5",
+    "resources": {
+      "deployment":  {"prIcon": "deploy"},
+      "service":     {"prIcon": "svc"},
+      "pod":         {"prIcon": "pod"},
+      "ingress":     {"prIcon": "ing"},
+      "configmap":   {"prIcon": "cm"},
+      "secret":      {"prIcon": "secret"},
+      "cronjob":     {"prIcon": "cronjob"},
+      "job":         {"prIcon": "job"},
+      "statefulset": {"prIcon": "sts"},
+      "daemonset":   {"prIcon": "ds"},
+      "hpa":         {"prIcon": "hpa"},
+      "pvc":         {"prIcon": "pvc"},
+      "pv":          {"prIcon": "pv"},
+      "sa":          {"prIcon": "sa"},
+      "role":        {"prIcon": "role"},
+      "clusterrole": {"prIcon": "c-role"},
+      "ns":          {"prIcon": "ns"},
+      "node":        {"prIcon": "node"}
+    }
+  },
+
+  "forbidden_rules": [
+    {
+      "description": "In-cluster databases/caches must use K8s icons, not cloud-managed icons",
+      "condition": "category == 'k8s_workload' AND provider_type starts with 'k8s.'",
+      "bad_style_fragment": "mxgraph.aws4.elasticache",
+      "correct_template": "k8s_deployment"
+    },
+    {
+      "description": "K8s workloads must not use plain rectangles on L2/L3",
+      "condition": "category == 'k8s_workload' AND level in ('L2', 'L3')",
+      "bad_style_fragment": "rounded=1;whiteSpace=wrap",
+      "exception": "l3_detail.type == 'detail_card' (card itself is allowed, but must be paired with icon)",
+      "correct_template": "k8s_deployment or k8s_service"
+    }
+  ]
+}

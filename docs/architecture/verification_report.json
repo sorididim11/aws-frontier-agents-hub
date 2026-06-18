@@ -1,0 +1,1404 @@
+{
+  "status": "PASS",
+  "timestamp": "2026-04-26T13:29:53.120876+00:00",
+  "summary": {
+    "total": 232,
+    "passed": 232,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "category": "structure",
+      "check": "diagram_count",
+      "target": "mxfile",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "page_name_contains_level",
+      "target": "Page 1: L1 — Service View",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "page_name_contains_level",
+      "target": "Page 2: L2 — Component View",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "page_name_contains_level",
+      "target": "Page 3: L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "page_name_contains_level",
+      "target": "Page 4: L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "page_name_contains_level",
+      "target": "Page 5: L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "page_name_contains_level",
+      "target": "Page 6: L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_graph_model",
+      "target": "Page 1",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_root",
+      "target": "Page 1",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_graph_model",
+      "target": "Page 2",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_root",
+      "target": "Page 2",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_graph_model",
+      "target": "Page 3",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_root",
+      "target": "Page 3",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_graph_model",
+      "target": "Page 4",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_root",
+      "target": "Page 4",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_graph_model",
+      "target": "Page 5",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_root",
+      "target": "Page 5",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_graph_model",
+      "target": "Page 6",
+      "status": "PASS"
+    },
+    {
+      "category": "structure",
+      "check": "has_root",
+      "target": "Page 6",
+      "status": "PASS"
+    },
+    {
+      "category": "naming_conventions",
+      "check": "ids_kebab_case",
+      "target": "knowledge.json",
+      "status": "PASS"
+    },
+    {
+      "category": "naming_conventions",
+      "check": "ids_unique",
+      "target": "knowledge.json",
+      "status": "PASS"
+    },
+    {
+      "category": "l1_compliance",
+      "check": "no_k8s_icons_in_l1",
+      "target": "L1 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l1_compliance",
+      "check": "no_namespace_groups_in_l1",
+      "target": "L1 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l1_compliance",
+      "check": "has_flow_edges",
+      "target": "L1 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l2_compliance",
+      "check": "has_namespace_containers",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l2_compliance",
+      "check": "has_k8s_deploy_icons",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l2_compliance",
+      "check": "has_k8s_svc_icons",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l2_compliance",
+      "check": "has_provider_icons",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_resource_detail_cards",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_collapsed_service_icons",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "l3_k8s_workloads_have_icons",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "l3_k8s_services_have_icons",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_resource_detail_cards",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_collapsed_service_icons",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_collapsed_service_icons",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_resource_detail_cards",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_compliance",
+      "check": "has_collapsed_service_icons",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "icon_completeness",
+      "check": "valid_icon_templates",
+      "target": "knowledge.json",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Operator on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Operator on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Simulator on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Simulator on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Simulator on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Simulator on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Simulator on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Simulator on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "simulator-svc on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "simulator-svc on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DockerCoins on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "WebUI on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "WebUI on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Worker on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Worker on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Hasher on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Hasher on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "RNG on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "RNG on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Redis on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Redis on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "hasher-svc on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "hasher-svc on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "rng-svc on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "rng-svc on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "redis-svc on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "redis-svc on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "webui-svc on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "webui-svc on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "investigation-cleanup on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "investigation-cleanup on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "AWS LB Controller on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "AWS LB Controller on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Application Signals on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "CloudWatch on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "CloudWatch on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "CloudWatch on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "CloudWatch on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "CloudWatch on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "SNS on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "SNS on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "SNS on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "SNS on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "EventBridge on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "EventBridge on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "EventBridge on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DevOps Agent on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DevOps Agent on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DevOps Agent on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DevOps Agent on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DevOps Agent on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DevOps Agent on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Bedrock on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Bedrock on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Bedrock on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Bedrock on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DynamoDB on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DynamoDB on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DynamoDB on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DynamoDB on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DynamoDB on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "RDS on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "RDS on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "RDS on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "ECR on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "ECR on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "FIS on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "FIS on L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Event Handler on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Event Handler on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Event Handler on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Webhook Fwd on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Webhook Fwd on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Webhook Fwd on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Webhook Setup on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Webhook Setup on L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Secrets Manager on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "X-Ray on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "ALB on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "DockerCoins M2 on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Alarm Pipeline M2 on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "EKS M2 Cluster on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "EKS M2 Cluster on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "RDS M2 on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "VPC Endpoint Service on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "VPC Endpoint Service on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "VPC Endpoint on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "VPC Endpoint on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Agent X-Account Role on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Agent X-Account Role on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Agent X-Account Role on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Dashboard X-Account Role on L1",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Dashboard X-Account Role on L2",
+      "status": "PASS"
+    },
+    {
+      "category": "completeness",
+      "check": "service_present",
+      "target": "Dashboard X-Account Role on L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Simulator (id: dashboard)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "simulator-svc (id: dashboard-svc)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "WebUI (id: webui)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Worker (id: worker)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Hasher (id: hasher)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "RNG (id: rng)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Redis (id: redis)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "hasher-svc (id: hasher-svc)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "rng-svc (id: rng-svc)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "redis-svc (id: redis-svc)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "webui-svc (id: webui-svc)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "investigation-cleanup (id: investigation-cleanup)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "AWS LB Controller (id: aws-lb-controller)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Application Signals (id: application-signals)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "CloudWatch (id: cloudwatch)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "SNS (id: sns)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "EventBridge (id: eventbridge)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "DevOps Agent (id: agent-space)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Bedrock (id: bedrock)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "DynamoDB (id: dynamodb)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "RDS (id: rds)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "ECR (id: ecr)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "FIS (id: fis)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Event Handler (id: lambda-event-handler)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Webhook Fwd (id: lambda-webhook-fwd)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Webhook Setup (id: lambda-webhook-setup)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "EKS M2 Cluster (id: m2-eks-collapsed)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "VPC Endpoint Service (id: vpc-endpoint-service)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "VPC Endpoint (id: vpc-endpoint-interface)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Agent X-Account Role (id: m2-devops-agent-xaccount-role)",
+      "status": "PASS"
+    },
+    {
+      "category": "l3_coverage",
+      "check": "service_in_l3_page",
+      "target": "Dashboard X-Account Role (id: m2-dashboard-xaccount-role)",
+      "status": "PASS"
+    },
+    {
+      "category": "edge_label_quality",
+      "check": "action_oriented_labels",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "stereotypes",
+      "check": "l2_stereotype_annotations",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "legend_presence",
+      "check": "legend_exists",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "legend_presence",
+      "check": "legend_exists",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "component_breakdown",
+      "check": "components_rendered",
+      "target": "DevOps Agent on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "component_breakdown",
+      "check": "components_rendered",
+      "target": "Bedrock on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "component_breakdown",
+      "check": "components_rendered",
+      "target": "DynamoDB on L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "phantom_edges",
+      "check": "no_phantom_edges",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "phantom_edges",
+      "check": "no_phantom_edges",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "phantom_edges",
+      "check": "no_phantom_edges",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "phantom_edges",
+      "check": "no_phantom_edges",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "phantom_edges",
+      "check": "no_phantom_edges",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "phantom_edges",
+      "check": "no_phantom_edges",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "missing_edges",
+      "check": "all_expected_edges_present",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "missing_edges",
+      "check": "all_expected_edges_present",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "missing_edges",
+      "check": "all_expected_edges_present",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "missing_edges",
+      "check": "all_expected_edges_present",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "missing_edges",
+      "check": "all_expected_edges_present",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "missing_edges",
+      "check": "all_expected_edges_present",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "flows_edge_labels",
+      "check": "edge_labels_match_flows",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "flows_edge_labels",
+      "check": "edge_labels_match_flows",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "flows_edge_labels",
+      "check": "edge_labels_match_flows",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "flows_edge_labels",
+      "check": "edge_labels_match_flows",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "flows_edge_labels",
+      "check": "edge_labels_match_flows",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "flows_edge_labels",
+      "check": "edge_labels_match_flows",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "minimum_spacing",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "no_overlaps",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "flow_direction_ltr",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "canvas_utilization",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "edge_route_detour",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_top",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_bottom",
+      "target": "L1",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "minimum_spacing",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "no_overlaps",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "flow_direction_ltr",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "canvas_utilization",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "edge_route_detour",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_top",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_bottom",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "minimum_spacing",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "no_overlaps",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "canvas_utilization",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "edge_route_detour",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_top",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_bottom",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "minimum_spacing",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "no_overlaps",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "canvas_utilization",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "edge_route_detour",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_top",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_bottom",
+      "target": "L3 — Serverless Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "minimum_spacing",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "no_overlaps",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "canvas_utilization",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "edge_route_detour",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_top",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_bottom",
+      "target": "L3 — AI Investigation Pipeline",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "minimum_spacing",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "no_overlaps",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "canvas_utilization",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "edge_route_detour",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_top",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "layout_quality",
+      "check": "margin_bottom",
+      "target": "L3 — Cross-Account Networking",
+      "status": "PASS"
+    },
+    {
+      "category": "edge_routing_quality",
+      "check": "no_bottom_highway",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "edge_routing_quality",
+      "check": "cross_zone_corridor",
+      "target": "L2",
+      "status": "PASS"
+    },
+    {
+      "category": "observed_viz",
+      "check": "edge_thickness_varies",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "observed_viz",
+      "check": "alarm_badges_shown",
+      "target": "L2 page",
+      "status": "PASS"
+    },
+    {
+      "category": "observed_viz",
+      "check": "l3_metric_annotations",
+      "target": "L3 — EKS Resource View",
+      "status": "PASS"
+    },
+    {
+      "category": "staleness",
+      "check": "knowledge_fresh",
+      "target": "knowledge vs source files",
+      "status": "PASS"
+    }
+  ],
+  "failures": []
+}

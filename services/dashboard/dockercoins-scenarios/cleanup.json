@@ -1,0 +1,21 @@
+{
+    "id": "cleanup",
+    "name": "Cleanup All Test Resources",
+    "category": "cleanup",
+    "layer": "Utility",
+    "purpose": "모든 테스트 리소스 정리",
+    "flow": [
+        "테스트용 Deployment 일괄 삭제"
+    ],
+    "expected_root_cause": "",
+    "trigger": {
+        "type": "kubectl",
+        "command": "kubectl delete deployment test-imagepull-fail test-crashloop test-configmap-missing test-liveness-fail -n dockercoins --ignore-not-found"
+    },
+    "restore": {
+        "command": ""
+    },
+    "verification": {
+        "steps": []
+    }
+}

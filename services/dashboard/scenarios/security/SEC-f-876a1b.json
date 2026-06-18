@@ -1,0 +1,86 @@
+{
+  "id": "SEC-f-876a1b",
+  "devops_space_id": "7e86205f-79ea-4992-b1f3-eb5d24a1a439",
+  "name": "Cross-Tenant IDOR in Security API via sec_space_id Parameter Override and Unauthenticated Multi-Tenant Data Exposure",
+  "description": "The application's security API endpoints allow unauthenticated cross-tenant data access through two mechanisms:\n\n1. **Unauthenticated Multi-Tenant Configuration Leak**: The `/api/settings/security/links` endpoint exposes ALL tenant security configurations without any authentication, revealing security space IDs, pentest job IDs, target domains, and private GitHub repository information across multiple devops workspaces (68fd7f2c and 1858d751).\n\n2. **Cross-Tenant Context Switching via sec_space_id**: The `/api/security/insights/linked-spaces` endpoint accepts a `sec_space_id` query parameter that directly overrides the tenant context without authorization checks. When a security space ID belonging to a different tenant (devops_space 1858d751) is supplied, the response returns data specific to that other tenant. This is confirmed by differential behavior: valid cross-tenant IDs return tenant-specific data, while invalid/non-existent IDs fall back to the default configured space's data.\n\n3. **AWS-Dependent Endpoints Accept Cross-Tenant Parameters**: Multiple state-changing endpoints (`/api/settings/security/pentest/run`, `/api/settings/security/findings/<id>/remediate`) accept the `sec_space_id` parameter without authentication or authorization. These currently fail only at the AWS STS infrastructure level (not application-level authorization), meaning they would enable cross-tenant pentest execution and code remediation if the STS configuration were properly set up.\n\nNo authentication mechanism exists on any tested endpoint - no login redirects, no 401/403 responses, no session cookies, and no WWW-Authenticate headers are returned.",
+  "category": "security-OverviewApp",
+  "app_name": "OverviewApp",
+  "layer": "app",
+  "target_service": "OverviewApp",
+  "failure_mode": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "INSECURE_DIRECT_OBJECT_REFERENCE 취약점 — Cross-Tenant IDOR in Security API via sec_space_id Parameter Override and Unauthenticated Multi-Tenant Data Exposure",
+  "source": "security-agent",
+  "finding_id": "f-876a1b77-a157-40b9-ac40-028e407ef4fb",
+  "risk_level": "HIGH",
+  "risk_type": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "endpoint": "",
+  "attack_steps": [
+    {
+      "method": "GET",
+      "path": "/api/settings/security/links",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/insights/linked-spaces",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/insights/linked-spaces?sec_space_id=as-00000000-0000-0000-0000-000000000000",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/insights/linked-spaces?sec_space_id=as-nonexistent-fake-id",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/security/findings/f-38aefc10-d4c4-4f87-99cd-728039a9f3e5/remediate?sec_space_id=as-2f0e7212-47f7-406a-b115-646f0c7d5717",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "target",
+      "label": "/api/settings/security/links"
+    }
+  ],
+  "registered_at": "2026-06-09T10:50:10.959964+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: INSECURE_DIRECT_OBJECT_REFERENCE on \n# Endpoint: /api/settings/security/links"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "INSECURE_DIRECT_OBJECT_REFERENCE 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

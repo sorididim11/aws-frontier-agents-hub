@@ -1,0 +1,59 @@
+{
+  "id": "A04-cpu",
+  "name": "CPU Spike",
+  "category": "single-service",
+  "layer": "Application → Resource",
+  "purpose": "CPU 과부하 감지",
+  "flow": [
+    "rng /cpu?duration=30 호출",
+    "30초간 busy loop 실행",
+    "CPU 사용률 급증"
+  ],
+  "expected_root_cause": "Resource Issue - CPU throttling 확인",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl exec -n dockercoins deployment/worker -- wget -q -O- 'http://rng/cpu?duration=30' --timeout=40 &"
+  },
+  "restore": {
+    "command": ""
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "CPU 스파이크",
+        "type": "pod_logs",
+        "pod": "rng",
+        "pattern": "CPU stress|cpu",
+        "timeout": 45,
+        "poll_interval": 10
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 CPU 과부하임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "CloudWatch",
+        "K8s",
+        "Logs"
+      ],
+      "criteria": "CloudWatch CPU 메트릭, K8s pod 상태, 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "CPU 스파이크 → 응답 지연 → 서비스 저하 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "CPU 부하 유발 코드를 분석했는가"
+    }
+  }
+}

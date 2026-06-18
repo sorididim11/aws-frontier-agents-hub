@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "templates": [
+    {
+      "id": "NET-001",
+      "name": "Network Latency Injection",
+      "category": "network",
+      "layer": "Network",
+      "scope": "edge",
+      "chaos_kind": "NetworkChaos",
+      "file": "network/NET-001-delay.yaml.j2",
+      "description": "서비스 간 네트워크 지연 주입. downstream 서비스에 대한 호출 지연으로 timeout/에러 유발",
+      "applicability": {
+        "requires_edge": true
+      },
+      "default_params": {
+        "latency": "500ms",
+        "jitter": "100ms",
+        "direction": "to",
+        "duration": "5m"
+      },
+      "summary": {
+        "objective": "서비스 간 네트워크 지연 발생 시 DevOps Agent가 지연 원인과 영향 범위를 정확히 식별하는지 검증",
+        "detection_challenge": "대상 서비스 Pod는 정상 Running 상태. 호출하는 쪽에서 timeout/slow response가 발생하므로 Agent가 네트워크 레이어까지 조사해야 원인 파악 가능",
+        "success_criteria": [
+          "네트워크 지연이 근본 원인임을 식별",
+          "영향 받는 upstream 서비스를 정확히 파악",
+          "지연 수치와 임계값을 기반으로 심각도 판단"
+        ]
+      },
+      "verification_hints": {
+        "direct": {
+          "type": "pod_logs",
+          "pattern": "timeout|Timeout|TIMEOUT|deadline exceeded|read tcp.*i/o timeout"
+        },
+        "upstream": {
+          "type": "pod_logs",
+          "pattern": "timeout|ConnectionError|error|failed"
+        }
+      }
+    },
+    {
+      "id": "K8S-001",
+      "name": "CoreDNS Failure",
+      "category": "kubernetes",
+      "layer": "Kubernetes Platform",
+      "scope": "cluster",
+      "chaos_kind": "PodChaos",
+      "chaos_namespace": "kube-system",
+      "file": "kubernetes/K8S-001-dns-failure.yaml.j2",
+      "description": "CoreDNS pod 전체 중단. 클러스터 DNS resolve 불가로 모든 서비스 간 통신 실패. Pod 상태는 Running이나 실제 동작 불가",
+      "applicability": {},
+      "default_params": {
+        "duration": "3m"
+      },
+      "summary": {
+        "objective": "CoreDNS 장애 시 DevOps Agent가 DNS 레벨 근본 원인을 식별할 수 있는지 검증",
+        "detection_challenge": "모든 Pod 상태가 Running으로 정상 표시됨. 컨테이너 레벨 진단으로는 원인 파악 불가. Agent가 kube-system 네임스페이스의 CoreDNS까지 조사 범위를 넓혀야 함",
+        "success_criteria": [
+          "CoreDNS pod 장애를 근본 원인으로 식별",
+          "영향 받는 서비스 범위를 정확히 파악 (전체 서비스)",
+          "DNS resolution 실패가 증상의 원인임을 설명"
+        ]
+      },
+      "verification_hints": {
+        "all_services": {
+          "type": "pod_logs",
+          "pattern": "Name or service not known|DNS lookup failed|no such host|Temporary failure in name resolution|dial tcp.*lookup"
+        },
+        "coredns": {
+          "type": "pod_status",
+          "namespace": "kube-system",
+          "deployment": "coredns",
+          "expected": "not_ready"
+        }
+      }
+    }
+  ]
+}

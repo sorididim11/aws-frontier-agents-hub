@@ -1,0 +1,57 @@
+{
+  "id": "I07-fis-node",
+  "name": "FIS Node Failure",
+  "category": "aws",
+  "layer": "AWS → Infrastructure",
+  "purpose": "FIS를 통한 노드 장애 시뮬레이션 및 자동 복구 확인",
+  "flow": [
+    "FIS 실험 I07-node-failure 시작",
+    "노드 장애 발생",
+    "Pod 재스케줄링 및 자동 복구"
+  ],
+  "expected_root_cause": "Node Failure - 자동 복구 확인",
+  "trigger": {
+    "type": "kubectl",
+    "command": "aws fis start-experiment --experiment-template-id I07-node-failure --region ${AWS_REGION:-us-east-1} --no-cli-pager"
+  },
+  "restore": {
+    "command": ""
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "노드 장애 및 복구 확인",
+        "type": "manual",
+        "description": "FIS 실험 상태 확인 및 노드 자동 복구 대기: kubectl get nodes --watch",
+        "timeout": 300
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 FIS 노드 장애 주입임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "CloudWatch",
+        "CloudTrail"
+      ],
+      "criteria": "K8s 노드 상태, CloudWatch 메트릭, FIS 실험 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "노드 장애 → pod 재스케줄링 → 서비스 중단 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "FIS 실험 설정을 분석했는가"
+    }
+  }
+}

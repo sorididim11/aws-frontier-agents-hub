@@ -1,0 +1,161 @@
+{
+  "id": "FM-21-worker-oom",
+  "name": "Worker OOM Kill - Memory Limit 1Mi",
+  "target_service": "worker",
+  "skill_version": "2.1",
+  "category": "application",
+  "layer": "compute",
+  "trigger_mode": "reactive",
+  "purpose": "Worker deployment에 극단적으로 낮은 메모리 제한(1Mi)을 설정하여 OOM Kill을 유발하고, Agent가 CrashLoopBackOff 상태의 근본 원인을 정확히 진단하는지 검증합니다.",
+  "architecture": {
+    "components": [
+      {
+        "id": "webui",
+        "label": "WebUI",
+        "type": "app"
+      },
+      {
+        "id": "worker",
+        "label": "Worker",
+        "type": "app"
+      },
+      {
+        "id": "rng",
+        "label": "RNG",
+        "type": "app"
+      },
+      {
+        "id": "hasher",
+        "label": "Hasher",
+        "type": "app"
+      },
+      {
+        "id": "redis",
+        "label": "Redis",
+        "type": "app"
+      }
+    ],
+    "edges": [
+      {
+        "from": "webui",
+        "to": "redis",
+        "label": "HTTP"
+      },
+      {
+        "from": "worker",
+        "to": "rng",
+        "label": "HTTP"
+      },
+      {
+        "from": "worker",
+        "to": "hasher",
+        "label": "HTTP"
+      },
+      {
+        "from": "worker",
+        "to": "redis",
+        "label": "TCP:6379"
+      }
+    ],
+    "fault_path": [
+      "worker"
+    ]
+  },
+  "normal_flow": [
+    {
+      "step": "1. Worker → RNG",
+      "desc": "Worker가 RNG 서비스에서 랜덤 바이트를 요청"
+    },
+    {
+      "step": "2. Worker → Hasher",
+      "desc": "Worker가 Hasher 서비스에 해시 계산 요청"
+    },
+    {
+      "step": "3. Worker → Redis",
+      "desc": "Worker가 성공한 해시를 Redis에 저장"
+    }
+  ],
+  "fault_flow": [
+    {
+      "step": "1. Memory limit 1Mi 설정",
+      "desc": "Worker pod에 1Mi 메모리 제한이 적용됨"
+    },
+    {
+      "step": "2. OOM Kill 발생",
+      "desc": "Worker 프로세스가 1Mi를 초과하여 커널에 의해 OOM Kill됨"
+    },
+    {
+      "step": "3. CrashLoopBackOff",
+      "desc": "반복적인 OOM Kill로 인해 pod가 CrashLoopBackOff 상태에 진입"
+    },
+    {
+      "step": "4. 코인 채굴 중단",
+      "desc": "Worker가 동작하지 않아 전체 파이프라인 중단"
+    }
+  ],
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl set resources deployment/worker -n dockercoins --limits=memory=1Mi --requests=memory=1Mi && kubectl rollout restart deployment/worker -n dockercoins"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "pod_status",
+        "phase": "trigger_active",
+        "pod": "worker",
+        "expected": "CrashLoopBackOff",
+        "timeout": 90,
+        "poll_interval": 10
+      },
+      {
+        "type": "kubectl_check",
+        "phase": "effect_observed",
+        "command": "kubectl get pod -l app=worker -n dockercoins -o jsonpath='{.items[0].status.containerStatuses[0].lastState.terminated.reason}'",
+        "expected": "OOMKilled",
+        "timeout": 120,
+        "poll_interval": 10
+      },
+      {
+        "type": "investigation_event",
+        "phase": "reaction_confirmed",
+        "expected_status": "IN_PROGRESS",
+        "timeout": 300,
+        "poll_interval": 15
+      },
+      {
+        "type": "investigation_event",
+        "phase": "reaction_confirmed",
+        "expected_status": "COMPLETED",
+        "timeout": 600,
+        "poll_interval": 20
+      }
+    ]
+  },
+  "restore": {
+    "command": "kubectl set resources deployment/worker -n dockercoins --limits=memory=128Mi --requests=memory=64Mi && kubectl rollout restart deployment/worker -n dockercoins"
+  },
+  "evaluation_rubric": {
+    "criteria": [
+      {
+        "name": "OOM Kill 감지",
+        "weight": 25,
+        "type": "detection"
+      },
+      {
+        "name": "CrashLoopBackOff 원인 식별",
+        "weight": 25,
+        "type": "analysis"
+      },
+      {
+        "name": "메모리 제한 1Mi가 근본 원인임을 파악",
+        "weight": 30,
+        "type": "analysis"
+      },
+      {
+        "name": "적절한 메모리 제한 복원 권고",
+        "weight": 20,
+        "type": "observation"
+      }
+    ]
+  }
+}

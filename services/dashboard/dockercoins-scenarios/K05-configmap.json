@@ -1,0 +1,58 @@
+{
+  "id": "K05-configmap",
+  "name": "ConfigMap Missing",
+  "category": "kubernetes",
+  "layer": "Kubernetes → Configuration",
+  "purpose": "존재하지 않는 ConfigMap 참조로 인한 컨테이너 생성 실패 감지",
+  "flow": [
+    "존재하지 않는 ConfigMap을 참조하는 Deployment 생성",
+    "컨테이너 생성 시 ConfigMap 마운트 실패",
+    "Pod 상태 CreateContainerConfigError 전환"
+  ],
+  "expected_root_cause": "Configuration Error - ConfigMap 존재 여부 확인",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl apply -f - <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: test-configmap-missing\n  namespace: dockercoins\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: test-configmap-missing\n  template:\n    metadata:\n      labels:\n        app: test-configmap-missing\n    spec:\n      containers:\n      - name: app\n        image: busybox\n        command: [\"sleep\", \"3600\"]\n        envFrom:\n        - configMapRef:\n            name: nonexistent-configmap\nEOF"
+  },
+  "restore": {
+    "command": "kubectl delete deployment test-configmap-missing -n dockercoins --ignore-not-found"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "CreateContainerConfigError 확인",
+        "type": "pod_status",
+        "pod": "test-configmap-missing",
+        "expected": "CreateContainerConfigError",
+        "timeout": 60,
+        "poll_interval": 5
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 ConfigMap 설정 오류임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "Logs"
+      ],
+      "criteria": "K8s ConfigMap, pod 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "잘못된 설정 → 서비스 오동작 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "ConfigMap 설정을 분석했는가"
+    }
+  }
+}

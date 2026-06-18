@@ -1,0 +1,348 @@
+{
+  "_description": "Reusable draw.io (mxGraph) building blocks. Parameterized templates for icons, containers, cards, and edges. Variables use {var} syntax.",
+
+  "templates": {
+    "aws_icon": {
+      "description": "AWS managed service icon",
+      "style": "sketch=0;fontColor=#232F3E;fillColor={fill};strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.{service};",
+      "width": 48,
+      "height": 48,
+      "variables": ["fill", "service"]
+    },
+    "aws_icon_custom": {
+      "description": "AWS service with non-standard shape (e.g., ALB)",
+      "style": "sketch=0;fontColor=#232F3E;fillColor={fill};strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;{shape_override};",
+      "width": 48,
+      "height": 48,
+      "variables": ["fill", "shape_override"]
+    },
+    "gcp_icon": {
+      "description": "GCP managed service icon",
+      "style": "sketch=0;fillColor=#4285F4;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.gcp2.{service};",
+      "width": 48,
+      "height": 48,
+      "variables": ["service"]
+    },
+    "k8s_deployment": {
+      "description": "Kubernetes Deployment icon",
+      "style": "shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor={fill};strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;",
+      "width": 48,
+      "height": 48,
+      "variables": ["fill"],
+      "defaults": {"fill": "#326CE5"}
+    },
+    "k8s_service": {
+      "description": "Kubernetes Service icon",
+      "style": "shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor={fill};strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;",
+      "width": 40,
+      "height": 40,
+      "variables": ["fill"],
+      "defaults": {"fill": "#326CE5"}
+    },
+    "k8s_resource": {
+      "description": "Generic Kubernetes resource icon (pod, cronjob, ingress, etc.)",
+      "style": "shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon={prIcon};fillColor={fill};strokeColor=none;fontColor=#555;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;",
+      "width": 40,
+      "height": 40,
+      "variables": ["prIcon", "fill"],
+      "defaults": {"fill": "#326CE5"}
+    },
+    "user_actor": {
+      "description": "Human operator/user",
+      "style": "shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.user;sketch=0;fontStyle=1;fontSize=11;verticalLabelPosition=bottom;verticalAlign=top;align=center;",
+      "width": 48,
+      "height": 48,
+      "variables": []
+    },
+    "service_box": {
+      "description": "L1 service-level box (no internal detail)",
+      "style": "rounded=1;whiteSpace=wrap;fillColor={fill};strokeColor={stroke};strokeWidth=2;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;arcSize=12;sketch=0;",
+      "variables": ["fill", "stroke"]
+    },
+    "namespace_container": {
+      "description": "Namespace boundary box + label pair",
+      "container_style": "rounded=1;fillColor={fill};strokeColor={stroke};strokeWidth=1.5;arcSize=6;",
+      "label_style": "text;fontSize=9;fontStyle=1;fontColor={stroke};",
+      "variables": ["fill", "stroke"]
+    },
+    "boundary_box": {
+      "description": "Generic boundary (Account, VPC, Cluster, Region)",
+      "style": "rounded=1;fillColor=none;strokeColor={stroke};strokeWidth={strokeWidth};dashed={dashed};fontSize={fontSize};fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;",
+      "variables": ["stroke", "strokeWidth", "dashed", "fontSize"],
+      "defaults": {"strokeWidth": "2", "dashed": "1", "fontSize": "11"}
+    },
+    "group_container": {
+      "description": "Service group box (monitoring, lambda functions, etc.)",
+      "container_style": "rounded=1;fillColor={fill};strokeColor={stroke};strokeWidth=1;dashed=1;arcSize=6;",
+      "label_style": "text;fontSize=10;fontStyle=1;fontColor={stroke};",
+      "variables": ["fill", "stroke"]
+    },
+    "detail_card": {
+      "description": "L3 resource detail card (multi-line, left-aligned)",
+      "style": "rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor={stroke};strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;",
+      "variables": ["stroke"]
+    },
+    "service_card": {
+      "description": "L3 service detail card (compact)",
+      "style": "rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor={stroke};fontSize=8;align=left;spacingLeft=6;spacingTop=4;",
+      "variables": ["stroke"],
+      "defaults": {"stroke": "#1565C0"}
+    },
+    "collapsed_annotation": {
+      "description": "L3 collapsed service annotation text",
+      "style": "text;fontSize=8;fontColor=#888;whiteSpace=wrap;",
+      "variables": []
+    },
+    "title_text": {
+      "description": "Page title",
+      "style": "text;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;",
+      "variables": []
+    },
+    "legend_title": {
+      "description": "Legend section title",
+      "style": "text;fontSize=10;fontStyle=1;verticalAlign=top;",
+      "variables": []
+    },
+    "legend_body": {
+      "description": "Legend description text",
+      "style": "text;fontSize=8;fontColor=#666;whiteSpace=wrap;",
+      "variables": []
+    }
+  },
+
+  "edge_styles": {
+    "app_internal": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;",
+      "color": "#1565C0",
+      "dashed": false,
+      "description": "Application internal traffic (blue solid)"
+    },
+    "fault_injection": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;",
+      "color": "#D32F2F",
+      "dashed": true,
+      "description": "Fault injection / chaos (red dashed)"
+    },
+    "alarm_pipeline": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;",
+      "color": "#E65100",
+      "dashed": false,
+      "description": "Monitoring / alarm pipeline (orange solid)"
+    },
+    "investigation": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;",
+      "color": "#2E7D32",
+      "dashed": false,
+      "description": "Investigation / observability (green solid)"
+    },
+    "llm_evaluation": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;fontSize=8;",
+      "color": "#7B1FA2",
+      "dashed": false,
+      "description": "LLM / AI processing (purple solid)"
+    },
+    "data_query": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;strokeWidth=1;dashed=1;fontSize=8;",
+      "color": "#999999",
+      "dashed": true,
+      "description": "Data flow / query / storage (gray dashed)"
+    },
+    "observability": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E91E63;strokeWidth=1.5;dashed=1;fontSize=8;",
+      "color": "#E91E63",
+      "dashed": true,
+      "description": "Metrics / traces / logs (pink dashed)"
+    },
+    "deployment": {
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#FF9800;strokeWidth=1.5;dashed=1;fontSize=8;",
+      "color": "#FF9800",
+      "dashed": true,
+      "description": "CI/CD / image pull (amber dashed)"
+    }
+  },
+
+  "color_palettes": {
+    "namespace_colors": [
+      {"fill": "#FFEBEE", "stroke": "#E53935", "name": "red"},
+      {"fill": "#FFF8E1", "stroke": "#FF8F00", "name": "amber"},
+      {"fill": "#E8F5E9", "stroke": "#43A047", "name": "green"},
+      {"fill": "#E3F2FD", "stroke": "#1E88E5", "name": "blue"},
+      {"fill": "#F3E5F5", "stroke": "#8E24AA", "name": "purple"},
+      {"fill": "#F5F5F5", "stroke": "#9E9E9E", "name": "gray"},
+      {"fill": "#E0F7FA", "stroke": "#00ACC1", "name": "cyan"},
+      {"fill": "#FFF3E0", "stroke": "#FF9800", "name": "orange"},
+      {"fill": "#E8EAF6", "stroke": "#5C6BC0", "name": "indigo"},
+      {"fill": "#FCE4EC", "stroke": "#E91E63", "name": "pink"}
+    ],
+    "aws_category_colors": {
+      "management":  "#E7157B",
+      "compute":     "#ED7100",
+      "database":    "#C925D1",
+      "ai_ml":       "#01A88D",
+      "security":    "#DD344C",
+      "networking":  "#8C4FFF",
+      "storage":     "#3F8624",
+      "analytics":   "#8C4FFF",
+      "integration": "#E7157B"
+    },
+    "boundary_colors": {
+      "account": {"stroke": "#232F3E"},
+      "region":  {"stroke": "#232F3E"},
+      "vpc":     {"stroke": "#1565C0"},
+      "cluster": {"stroke": "#ED7100"},
+      "subnet":  {"stroke": "#43A047"}
+    },
+    "detail_card_colors": {
+      "deployment":      "#FF8F00",
+      "service":         "#1565C0",
+      "node_group":      "#FF9800",
+      "addon":           "#E91E63",
+      "instrumentation": "#5C6BC0",
+      "security":        "#607D8B",
+      "system":          "#9E9E9E",
+      "cronjob":         "#9C27B0"
+    }
+  },
+
+  "layout_guidelines": {
+    "min_spacing": 40,
+    "min_spacing_per_level": {"L1": 60, "L2": 40, "L3": 30},
+    "icon_sizes": {"aws": 48, "k8s_deploy": 48, "k8s_svc": 40, "k8s_other": 40, "cf_stack": 30},
+    "font_sizes": {"title": 16, "group_label": 12, "node_label": 11, "sub_label": 9, "detail": 8},
+    "canvas_defaults": {
+      "L1": {"width": 1400, "height": 780},
+      "L2": {"width": 2000, "height": 1400},
+      "L3": {"width": 2000, "height": 1700}
+    },
+    "l3_icon_card_pair": {
+      "description": "L3 detail cards must be paired with a K8s icon (24x24) at the top-left corner of the card",
+      "icon_offset_x": 2,
+      "icon_offset_y": 2,
+      "icon_size": 24,
+      "card_spacing_left": 30
+    }
+  },
+
+  "layout_formulas": {
+    "description": "Deterministic coordinate formulas for each level. The agent MUST use these when placing cells.",
+    "L1": {
+      "canvas": {"width": 1000, "height": 520},
+      "title": {
+        "x_formula": "canvas_w * 0.3",
+        "y": 5,
+        "width_formula": "canvas_w * 0.4",
+        "height": 40
+      },
+      "phase_labels": {
+        "y": 65,
+        "description": "Simple text labels positioned centered over the relevant top-row services. NO colored background zones."
+      },
+      "top_row": {
+        "description": "Main incident flow as a straight horizontal line. Services placed in phase sequence order.",
+        "y": 110,
+        "start_x": 80,
+        "margin_right": 80,
+        "spacing_formula": "x_i = start_x + i * ((canvas_w - start_x - margin_right) / (N - 1))",
+        "icon_size": {"width": 48, "height": 48},
+        "box_size": {"width": 140, "height": 55}
+      },
+      "bottom_row": {
+        "description": "Supporting/backend services. Positioned below the main flow, x-aligned under related top-row services.",
+        "y": 320,
+        "alignment": "center_under_connected_top_service"
+      },
+      "evaluation_edges": {
+        "description": "Purple evaluation edges route BELOW the main flow, not through it.",
+        "routing": "exit_source_downward_then_horizontal_to_target"
+      },
+      "legend": {
+        "x": 20,
+        "y_formula": "canvas_h - 60",
+        "description": "Single-line legend with colored edge samples"
+      }
+    },
+    "L2": {
+      "canvas": {"width": 2200, "height": 1600},
+      "zones": {
+        "description": "L2 is divided into clear zones. Every service MUST be placed within its designated zone.",
+        "ingress": {
+          "x_range": [20, 100],
+          "y_range": [80, 400],
+          "services": "Operator, ALB — leftmost column outside cluster"
+        },
+        "k8s_cluster": {
+          "x_range": [100, 1380],
+          "y_range": [80, 1150],
+          "description": "VPC > EKS > namespaces. Nested boundary boxes.",
+          "namespaces": {
+            "dashboard": {"x": 120, "y": 160, "width": 340, "height": 260},
+            "dockercoins": {
+              "x": 120, "y": 460, "width": 1240, "height": 500,
+              "internal_grid": {
+                "description": "Deploy+svc pairs in columns",
+                "col_spacing": 180,
+                "row_spacing": 150,
+                "start_x_offset": 40,
+                "start_y_offset": 70
+              }
+            },
+            "kube_system": {"x": 120, "y": 1000, "width": 300, "height": 130}
+          }
+        },
+        "aws_managed": {
+          "x_range": [1400, 2180],
+          "y_range": [80, 1150],
+          "description": "All cloud-managed services organized by group",
+          "monitoring_group": {
+            "y_range": [80, 440],
+            "description": "CloudWatch, SNS, EventBridge, X-Ray"
+          },
+          "lambda_group": {
+            "y_range": [470, 780],
+            "description": "Lambda functions group"
+          },
+          "backends": {
+            "y_range": [800, 1100],
+            "grid": {
+              "cols": 3,
+              "col_spacing": 200,
+              "row_spacing": 180,
+              "start_x": 1420,
+              "start_y": 820
+            },
+            "description": "DevOps Agent, Bedrock, DynamoDB, RDS, ECR, FIS, Secrets Manager"
+          }
+        }
+      },
+      "edge_routing": {
+        "cross_zone_corridor_x": 1390,
+        "max_edge_y": 1200,
+        "min_edge_y": 60,
+        "stack_spacing": 20,
+        "rules": [
+          "Never route edges along bottom of canvas (y > 1400)",
+          "Cross-zone edges use corridor at x ≈ 1390",
+          "Stack parallel edges with 20px vertical spacing",
+          "Dashboard evaluation edges exit RIGHT through corridor, not U-turn down"
+        ]
+      },
+      "legend": {"x": 40, "y": 1300}
+    },
+    "L3": {
+      "canvas": {"width": 2200, "height": 1800},
+      "focal_zone": {
+        "x_range": [20, 1500],
+        "description": "70% width for focal services with detail cards or component breakdowns",
+        "card_spacing": {"horizontal": 200, "vertical": 250},
+        "deploy_svc_pair_offset": {"x": 0, "y": 70}
+      },
+      "collapsed_zone": {
+        "x_range": [1550, 2180],
+        "description": "30% width right sidebar for collapsed service icons",
+        "start_y": 80,
+        "icon_spacing_y": 120,
+        "annotation_offset": {"x": 60, "y": 15}
+      }
+    }
+  }
+}

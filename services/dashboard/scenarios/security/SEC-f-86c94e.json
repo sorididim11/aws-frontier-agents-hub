@@ -1,0 +1,45 @@
+{
+  "id": "SEC-f-86c94e",
+  "name": "Plaintext Password Storage Without Hashing in WebUI",
+  "description": "The WebUI application source code (services/dockercoins/webui/webui.js) stores user passwords as plaintext in a SQLite database without applying any cryptographic hashing algorithm. The `crypto` module is imported on line 12 but is never used for password operations. No password hashing libraries (bcrypt, argon2, scrypt, pbkdf2) exist anywhere in the project.\n\nSpecifically:\n1. Admin user seeded with plaintext password 'admin123' (line 47): `db.prepare(\"INSERT INTO users (username, password, email, role, api_key) VALUES (?, ?, ?, ?, ?)\").run('admin', 'admin123', ...)`\n2. User registration stores raw password directly (line 119): `\"INSERT INTO users (username, password, email, api_key) VALUES ('\" + username + \"', '\" + password + \"', '\" + email + \"', '\" + apiKey + \"')\"`\n3. Login authenticates by plaintext comparison in SQL WHERE clause (line 94): `\"SELECT * FROM users WHERE username = '\" + username + \"' AND password = '\" + password + \"'\"`\n4. The /admin/users endpoint (line 186) returns all user data including the plaintext password column\n5. The /profile/:id endpoint returns full user records including passwords\n\nThis means any vulnerability granting database access (SQL injection, path traversal to /tmp/dockercoins.db, IDOR on profile endpoints, or the unauthenticated /admin/users endpoint) would immediately reveal all user passwords in cleartext. The vulnerable code is the designated build artifact per the project's Dockerfile and deployment scripts.\n\nNote: The currently deployed target runs a minimal version without authentication endpoints, preventing runtime exploitation. However, the vulnerable code exists in the build pipeline and is intended for production deployment.",
+  "category": "security-DockerCoins",
+  "app_name": "DockerCoins",
+  "layer": "app",
+  "target_service": "DockerCoins",
+  "failure_mode": "CRYPTOGRAPHIC_VULNERABILITIES",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "CRYPTOGRAPHIC_VULNERABILITIES 취약점 — Plaintext Password Storage Without Hashing in WebUI",
+  "source": "security-agent",
+  "finding_id": "f-86c94e85-4e4c-49fe-8b87-a872bc6f850d",
+  "risk_level": "MEDIUM",
+  "risk_type": "CRYPTOGRAPHIC_VULNERABILITIES",
+  "endpoint": "",
+  "attack_steps": [],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "target",
+      "label": "/"
+    }
+  ],
+  "registered_at": "2026-05-13T23:25:17.335655+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: CRYPTOGRAPHIC_VULNERABILITIES on \n# Endpoint: /"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "CRYPTOGRAPHIC_VULNERABILITIES 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  },
+  "devops_space_id": "4c035899-a296-49b2-b524-ba81d1256f43"
+}

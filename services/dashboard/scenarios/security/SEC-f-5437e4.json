@@ -1,0 +1,45 @@
+{
+  "id": "SEC-f-5437e4",
+  "devops_space_id": "7e86205f-79ea-4992-b1f3-eb5d24a1a439",
+  "name": "Cross-Tenant IDOR in Scenario Run History and Evaluation Endpoints via space_id Parameter Manipulation",
+  "description": "The application's API endpoints accept a user-controlled `space_id` parameter without authentication or ownership validation. However, actual cross-tenant data access could not be demonstrated. While the application has zero authentication (no endpoint returns 401/403) and accepts arbitrary space_id values, all endpoints that would return tenant-specific data either fail with AWS STS infrastructure errors (returning empty items arrays) or echo the input parameter in error messages without differentiating between real and fabricated tenant identifiers. The space-info endpoint returns identical \"CONNECTED\" status for any space_id including completely fabricated UUIDs, proving it constructs responses from input rather than performing actual tenant data lookups. The evaluate endpoint reflects whatever space_id is provided in its error message identically for both real tenant IDs and fabricated ones. No actual tenant-specific object data (run records, evaluation scores, scenario details) was ever retrieved from another tenant's namespace.",
+  "category": "security-OverviewApp",
+  "app_name": "OverviewApp",
+  "layer": "app",
+  "target_service": "OverviewApp",
+  "failure_mode": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "INSECURE_DIRECT_OBJECT_REFERENCE 취약점 — Cross-Tenant IDOR in Scenario Run History and Evaluation Endpoints via space_id Parameter Manipulation",
+  "source": "security-agent",
+  "finding_id": "f-5437e418-274d-4f72-8525-038a12125e41",
+  "risk_level": "LOW",
+  "risk_type": "INSECURE_DIRECT_OBJECT_REFERENCE",
+  "endpoint": "",
+  "attack_steps": [],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "target",
+      "label": "/"
+    }
+  ],
+  "registered_at": "2026-06-09T11:02:18.865268+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: INSECURE_DIRECT_OBJECT_REFERENCE on \n# Endpoint: /"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "INSECURE_DIRECT_OBJECT_REFERENCE 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

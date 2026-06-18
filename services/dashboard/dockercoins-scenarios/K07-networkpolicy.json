@@ -1,0 +1,56 @@
+{
+  "id": "K07-networkpolicy",
+  "name": "NetworkPolicy Deny All",
+  "category": "kubernetes",
+  "layer": "Kubernetes → Network",
+  "purpose": "NetworkPolicy로 인한 네트워크 차단 감지",
+  "flow": [
+    "모든 ingress를 차단하는 NetworkPolicy 생성",
+    "테스트 Pod에 대한 네트워크 접근 차단",
+    "서비스 간 통신 실패"
+  ],
+  "expected_root_cause": "Network Policy - ingress 규칙 확인",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl apply -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: test-deny-all\n  namespace: dockercoins\nspec:\n  podSelector:\n    matchLabels:\n      app: test-deny-all\n  policyTypes:\n  - Ingress\n  ingress: []\nEOF"
+  },
+  "restore": {
+    "command": "kubectl delete networkpolicy test-deny-all -n dockercoins --ignore-not-found"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "네트워크 차단 확인",
+        "type": "manual",
+        "description": "네트워크 차단 확인: kubectl run test-curl --rm -i --restart=Never -n dockercoins --image=curlimages/curl -- curl -s --max-time 5 http://test-deny-all-svc:80",
+        "timeout": 60
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 NetworkPolicy 차단임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "Logs"
+      ],
+      "criteria": "K8s NetworkPolicy, 연결 실패 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "NetworkPolicy → 트래픽 차단 → 서비스 연결 실패 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "NetworkPolicy 설정을 분석했는가"
+    }
+  }
+}

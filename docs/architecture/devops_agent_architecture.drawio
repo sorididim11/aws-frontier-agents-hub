@@ -1,0 +1,985 @@
+<mxfile host="render_drawio.py" agent="architecture-skill" version="1.0">
+  <diagram name="L1 — Service View" id="l1">
+    <mxGraphModel dx="1400" dy="780" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="l1-title" value="L1 — Service View: DevOps Agent Test Simulator (Multi-Account)" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+        <mxGeometry x="200" y="5" width="1100" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-phases" value="&lt;font color=&quot;#1565C0&quot;&gt;① Inject Fault&lt;/font&gt; &amp;nbsp;&amp;nbsp; &lt;font color=&quot;#E65100&quot;&gt;② Detect &amp;amp; Alert&lt;/font&gt; &amp;nbsp;&amp;nbsp; &lt;font color=&quot;#2E7D32&quot;&gt;③ AI Investigation&lt;/font&gt; &amp;nbsp;&amp;nbsp; &lt;font color=&quot;#7B1FA2&quot;&gt;④ Evaluate Quality&lt;/font&gt;" style="text;fontSize=11;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="200" y="50" width="1000" height="25" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 1 Account Boundary ═══ -->
+      <mxCell id="l1-m1-boundary" value="AWS Account 111111111111 (Member 1)" style="rounded=1;fillColor=none;strokeColor=#232F3E;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;" vertex="1" parent="1">
+        <mxGeometry x="20" y="75" width="1360" height="310" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 1: Top Row (main incident flow) ═══ -->
+      <mxCell id="l1-operator" value="Operator" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.user;sketch=0;fontStyle=1;fontSize=11;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="80" y="110" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-operator" value="&amp;lt;&amp;lt;User&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="65" y="162" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-dashboard" value="Simulator" style="rounded=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1E88E5;strokeWidth=2;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;arcSize=12;sketch=0;html=1;" vertex="1" parent="1">
+        <mxGeometry x="250" y="107" width="110" height="55" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-dashboard" value="&amp;lt;&amp;lt;WebUI&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="265" y="162" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-dockercoins-app" value="DockerCoins" style="rounded=1;whiteSpace=wrap;fillColor=#FFF8E1;strokeColor=#FF8F00;strokeWidth=2;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;arcSize=12;sketch=0;html=1;" vertex="1" parent="1">
+        <mxGeometry x="430" y="107" width="140" height="55" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-dockercoins-app" value="&amp;lt;&amp;lt;Application&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="450" y="165" width="100" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-cloudwatch" value="CloudWatch" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;html=1;" vertex="1" parent="1">
+        <mxGeometry x="680" y="110" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-cloudwatch" value="&amp;lt;&amp;lt;Monitoring&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="665" y="162" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-sns" value="SNS" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;html=1;" vertex="1" parent="1">
+        <mxGeometry x="876" y="110" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-sns" value="&amp;lt;&amp;lt;Messaging&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="861" y="162" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-lambda-webhook-fwd" value="Webhook Fwd" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1072" y="110" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-lambda-webhook-fwd" value="&amp;lt;&amp;lt;EventHandler&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1050" y="162" width="92" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-agent-space" value="DevOps Agent" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.devops_agent;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1268" y="110" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-agent-space" value="&amp;lt;&amp;lt;Orchestrator&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1247" y="162" width="90" height="18" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 1: Bottom Row (supporting services) ═══ -->
+      <mxCell id="l1-bedrock" value="Bedrock" style="sketch=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;html=1;" vertex="1" parent="1">
+        <mxGeometry x="680" y="280" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-bedrock" value="&amp;lt;&amp;lt;AI:Reasoning&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="662" y="332" width="84" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-eventbridge" value="EventBridge" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;html=1;" vertex="1" parent="1">
+        <mxGeometry x="940" y="280" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-eventbridge" value="&amp;lt;&amp;lt;Messaging&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="925" y="332" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-lambda-event-handler" value="Event Handler" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1120" y="280" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-lambda-event-handler" value="&amp;lt;&amp;lt;EventHandler&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1098" y="332" width="92" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-dynamodb" value="DynamoDB" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1268" y="280" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-dynamodb" value="&amp;lt;&amp;lt;Persistence&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1250" y="332" width="84" height="18" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 2 Account Boundary ═══ -->
+      <mxCell id="l1-m2-boundary" value="AWS Account 222222222222 (Member 2)" style="rounded=1;fillColor=none;strokeColor=#232F3E;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;" vertex="1" parent="1">
+        <mxGeometry x="20" y="450" width="1360" height="230" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 2: Services ═══ -->
+      <mxCell id="l1-m2-dockercoins-app" value="DockerCoins M2" style="rounded=1;whiteSpace=wrap;fillColor=#FFF8E1;strokeColor=#FF8F00;strokeWidth=2;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;arcSize=12;sketch=0;html=1;" vertex="1" parent="1">
+        <mxGeometry x="430" y="510" width="140" height="55" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-m2-dockercoins-app" value="&amp;lt;&amp;lt;Application&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="450" y="568" width="100" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-m2-alarm-pipeline" value="Alarm Pipeline M2" style="rounded=1;whiteSpace=wrap;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;fontSize=11;fontStyle=1;verticalAlign=middle;align=center;arcSize=12;sketch=0;html=1;" vertex="1" parent="1">
+        <mxGeometry x="680" y="510" width="140" height="55" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-m2-alarm-pipeline" value="&amp;lt;&amp;lt;EventHandler&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="700" y="568" width="100" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-m2-devops-agent-xaccount-role" value="Agent X-Account&lt;br&gt;Role" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.iam;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1120" y="490" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-m2-devops-agent-xaccount-role" value="&amp;lt;&amp;lt;Security&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1105" y="552" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-m2-dashboard-xaccount-role" value="Dashboard&lt;br&gt;X-Account Role" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.iam;html=1;" vertex="1" parent="1">
+        <mxGeometry x="250" y="510" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-st-m2-dashboard-xaccount-role" value="&amp;lt;&amp;lt;Security&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="235" y="572" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 1: Existing Edges ═══ -->
+      <mxCell id="l1-e0" value="시나리오 선택·실행" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-operator" target="l1-dashboard" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e1" value="chaos API 호출" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l1-dashboard" target="l1-dockercoins-app" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e2" value="에러율·지연 → CW Alarm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-dockercoins-app" target="l1-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e3" value="Alarm → SNS topic 발행" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-cloudwatch" target="l1-sns" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e4" value="Lambda 구독 매칭 → invoke" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-sns" target="l1-lambda-webhook-fwd" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e5" value="알람 JSON → POST /webhook 전달" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-lambda-webhook-fwd" target="l1-agent-space" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e6" value="가설별 증거 수집" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-agent-space" target="l1-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e7" value="root cause 분석 요청" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-agent-space" target="l1-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e8" value="이벤트 발행" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-agent-space" target="l1-eventbridge" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e9" value="이벤트 규칙 매칭 → Lambda 호출" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-eventbridge" target="l1-lambda-event-handler" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e10" value="조사 결과 저장" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-lambda-event-handler" target="l1-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e11" value="조사 결과 조회" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;strokeWidth=1;dashed=1;fontSize=8;html=1;" edge="1" source="l1-dashboard" target="l1-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e12" value="5축 품질 평가" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-dashboard" target="l1-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Cross-Account Edges ═══ -->
+      <mxCell id="l1-e-xacct-dashboard" value="cross-account AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l1-dashboard" target="l1-m2-dashboard-xaccount-role" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e-xacct-agent" value="cross-account AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-agent-space" target="l1-m2-devops-agent-xaccount-role" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l1-e-privatelink" value="PrivateLink 터널로 서비스 접근" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-m2-dockercoins-app" target="l1-dockercoins-app" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 2 Internal Edge ═══ -->
+      <mxCell id="l1-e-m2-alarm" value="독립 알람 파이프라인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l1-m2-dockercoins-app" target="l1-m2-alarm-pipeline" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Legend ═══ -->
+      <mxCell id="l1-legend" value="&lt;b&gt;Legend:&lt;/b&gt; &lt;font color=&quot;#1565C0&quot;&gt;── app_internal / PrivateLink&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#D32F2F&quot;&gt;-- fault_injection / X-Account&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#E65100&quot;&gt;── alarm_pipeline&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#2E7D32&quot;&gt;── investigation / X-Account&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#999999&quot;&gt;-- data_query&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#7B1FA2&quot;&gt;── llm_evaluation&lt;/font&gt;" style="text;fontSize=9;html=1;" vertex="1" parent="1">
+        <mxGeometry x="20" y="710" width="1360" height="30" as="geometry"/>
+      </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="L2 — Component View" id="l2">
+    <mxGraphModel dx="3200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3200" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="l2-title" value="L2 — Component View: DevOps Agent Test Simulator (Multi-Account)" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="15" width="800" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-bound-0" value="AWS Account 111111111111 (Member 1)" style="rounded=1;fillColor=none;strokeColor=#232F3E;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="10" y="50" width="2180" height="1500" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-bound-1" value="VPC 10.0.0.0/16" style="rounded=1;fillColor=none;strokeColor=#1565C0;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="l2-bound-0">
+        <mxGeometry x="20" y="30" width="2140" height="1450" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-bound-2" value="EKS: devops-agent-test-cluster (v1.28)" style="rounded=1;fillColor=none;strokeColor=#ED7100;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="l2-bound-1">
+        <mxGeometry x="80" y="60" width="1220" height="1130" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ns-dashboard" value="" style="rounded=1;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=1.5;arcSize=6;html=1;container=1;collapsible=0;" vertex="1" parent="l2-bound-2">
+        <mxGeometry x="40" y="60" width="400" height="220" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ns-dashboard-label" value="ns: dashboard" style="text;fontSize=10;fontStyle=1;fontColor=#E53935;html=1;" vertex="1" parent="l2-ns-dashboard">
+        <mxGeometry x="10" y="5" width="100" height="20" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ns-dockercoins" value="" style="rounded=1;fillColor=#FFF8E1;strokeColor=#FF8F00;strokeWidth=1.5;arcSize=6;html=1;container=1;collapsible=0;" vertex="1" parent="l2-bound-2">
+        <mxGeometry x="40" y="320" width="1140" height="480" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ns-dockercoins-label" value="ns: dockercoins" style="text;fontSize=10;fontStyle=1;fontColor=#FF8F00;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="10" y="5" width="120" height="20" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ns-kube-system" value="" style="rounded=1;fillColor=#F5F5F5;strokeColor=#9E9E9E;strokeWidth=1.5;arcSize=6;html=1;container=1;collapsible=0;" vertex="1" parent="l2-bound-2">
+        <mxGeometry x="40" y="840" width="300" height="250" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ns-kube-system-label" value="ns: kube-system" style="text;fontSize=10;fontStyle=1;fontColor=#9E9E9E;html=1;" vertex="1" parent="l2-ns-kube-system">
+        <mxGeometry x="10" y="5" width="120" height="20" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-operator" value="Operator" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.user;sketch=0;fontStyle=1;fontSize=11;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="30" y="200" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-operator" value="&amp;lt;&amp;lt;User&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="15" y="255" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-dashboard" value="Simulator" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dashboard">
+        <mxGeometry x="50" y="55" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-dashboard" value="&amp;lt;&amp;lt;WebUI&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dashboard">
+        <mxGeometry x="38" y="108" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-dashboard-svc" value="simulator-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dashboard">
+        <mxGeometry x="240" y="60" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-dashboard-svc" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dashboard">
+        <mxGeometry x="228" y="105" width="64" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-webui" value="WebUI" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="50" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-webui" value="&amp;lt;&amp;lt;WebUI&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="38" y="103" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-worker" value="Worker" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="250" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-worker" value="&amp;lt;&amp;lt;Stateful:Queue&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="234" y="103" width="80" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-hasher" value="Hasher" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="450" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-alarm-hasher" value="⚠ ALARM: OOMKilled" style="rounded=1;fillColor=#D32F2F;fontColor=#FFF;fontSize=7;fontStyle=1;strokeColor=#D32F2F;align=center;verticalAlign=middle;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="430" y="32" width="88" height="16" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-hasher" value="&amp;lt;&amp;lt;Stateless:HTTP&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="434" y="103" width="80" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-rng" value="RNG" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="650" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-rng" value="&amp;lt;&amp;lt;Stateless:HTTP&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="634" y="103" width="80" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-redis" value="Redis" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="850" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-redis" value="&amp;lt;&amp;lt;Cache&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="838" y="103" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-hasher-svc" value="hasher-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="454" y="200" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-hasher-svc" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="442" y="245" width="64" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-rng-svc" value="rng-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="654" y="200" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-rng-svc" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="642" y="245" width="64" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-redis-svc" value="redis-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="854" y="200" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-redis-svc" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="842" y="245" width="64" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-webui-svc" value="webui-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="54" y="200" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-webui-svc" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="42" y="245" width="64" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-investigation-cleanup" value="investigation-cleanup" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=cronjob;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="1020" y="50" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-investigation-cleanup" value="&amp;lt;&amp;lt;CronJob&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-dockercoins">
+        <mxGeometry x="1003" y="95" width="74" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-aws-lb-controller" value="AWS LB Controller" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l2-ns-kube-system">
+        <mxGeometry x="50" y="55" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-aws-lb-controller" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-ns-kube-system">
+        <mxGeometry x="38" y="108" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-grp-monitoring" value="Monitoring" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FF9800;strokeWidth=1;dashed=1;arcSize=6;fontSize=10;fontStyle=1;fontColor=#FF9800;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="1460" y="100" width="700" height="200" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-cloudwatch" value="CloudWatch" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="40" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-cloudwatch" value="&amp;lt;&amp;lt;Monitoring&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="28" y="103" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-sns" value="SNS" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="220" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-sns" value="&amp;lt;&amp;lt;Messaging&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="208" y="103" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-eventbridge" value="EventBridge" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="400" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-eventbridge" value="&amp;lt;&amp;lt;Messaging&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="388" y="103" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-xray" value="X-Ray" style="sketch=0;fontColor=#232F3E;fillColor=#8C4FFF;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.xray;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="580" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-xray" value="&amp;lt;&amp;lt;Tracing&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-monitoring">
+        <mxGeometry x="568" y="103" width="72" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-grp-lambda-functions" value="Lambda Functions" style="rounded=1;fillColor=#FFF8E1;strokeColor=#FF8F00;strokeWidth=1;dashed=1;arcSize=6;fontSize=10;fontStyle=1;fontColor=#FF8F00;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="1460" y="340" width="700" height="200" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-lambda-event-handler" value="Event Handler" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="l2-grp-lambda-functions">
+        <mxGeometry x="40" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-lambda-event-handler" value="&amp;lt;&amp;lt;EventHandler&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-lambda-functions">
+        <mxGeometry x="25" y="103" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-lambda-webhook-fwd" value="Webhook Fwd" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="l2-grp-lambda-functions">
+        <mxGeometry x="240" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-lambda-webhook-fwd" value="&amp;lt;&amp;lt;EventHandler&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-lambda-functions">
+        <mxGeometry x="225" y="103" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-lambda-webhook-setup" value="Webhook Setup" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="l2-grp-lambda-functions">
+        <mxGeometry x="440" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-lambda-webhook-setup" value="&amp;lt;&amp;lt;EventHandler&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-grp-lambda-functions">
+        <mxGeometry x="425" y="103" width="78" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-agent-space" value="DevOps Agent" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.devops_agent;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1500" y="620" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-agent-space" value="&amp;lt;&amp;lt;Orchestrator&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1483" y="673" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-bedrock" value="Bedrock" style="sketch=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1700" y="620" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-bedrock" value="&amp;lt;&amp;lt;AI:Reasoning&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1683" y="673" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-dynamodb" value="DynamoDB" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1900" y="620" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-dynamodb" value="&amp;lt;&amp;lt;Persistence&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1883" y="673" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-rds" value="RDS" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1500" y="780" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-rds" value="&amp;lt;&amp;lt;Persistence&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1483" y="833" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-ecr" value="ECR" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecr;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1700" y="780" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-ecr" value="&amp;lt;&amp;lt;CI/CD&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1683" y="833" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-fis" value="FIS" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fis;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1900" y="780" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-fis" value="&amp;lt;&amp;lt;Testing&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1883" y="833" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-secrets-manager" value="Secrets Manager" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.secrets_manager;html=1;" vertex="1" parent="1">
+        <mxGeometry x="2100" y="780" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-secrets-manager" value="&amp;lt;&amp;lt;Security&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="2083" y="833" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-alb" value="ALB" style="sketch=0;fontColor=#232F3E;fillColor=#8C4FFF;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.application_load_balancer;html=1;" vertex="1" parent="1">
+        <mxGeometry x="2100" y="620" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-alb" value="&amp;lt;&amp;lt;Gateway&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="2083" y="673" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e0" value="시나리오 선택·실행 (HTTP)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-operator" target="l2-dashboard" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e1" value="chaos API 호출 (POST /inject-latency)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l2-dashboard" target="l2-hasher" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e2" value="chaos API 호출 (POST /crash, /db-leak, /cpu, /oom)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l2-dashboard" target="l2-rng" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e3" value="Alarm → SNS topic 발행 (SNS Publish)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-cloudwatch" target="l2-sns" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e4" value="Lambda 구독 매칭 → invoke (Lambda invoke)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-sns" target="l2-lambda-webhook-fwd" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e5" value="알람 JSON → POST /webhook 전달 (POST /webhook)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-lambda-webhook-fwd" target="l2-agent-space" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e6" value="가설별 증거 수집 (GetLogEvents, GetMetricData)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-agent-space" target="l2-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e7" value="root cause 분석 요청 (InvokeModel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-agent-space" target="l2-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e8" value="이벤트 발행 (PutEvents)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-agent-space" target="l2-eventbridge" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e9" value="이벤트 규칙 매칭 → Lambda 호출 (Lambda invoke)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-eventbridge" target="l2-lambda-event-handler" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e10" value="조사 결과 저장 (PutItem)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-lambda-event-handler" target="l2-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e11" value="조사 결과 조회 (Query/Scan)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;strokeWidth=1;dashed=1;fontSize=8;html=1;" edge="1" source="l2-dashboard" target="l2-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e12" value="5축 품질 평가 (LLM-as-Judge, InvokeModel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-dashboard" target="l2-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e13" value="posts hash request (POST /hash)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-worker" target="l2-hasher-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e14" value="requests random data (GET /32)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-worker" target="l2-rng-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e15" value="publishes mining results (LPUSH/INCR)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-worker" target="l2-redis-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e16" value="reads mining progress (HLEN/GET)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-webui" target="l2-redis-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e17" value="queries random seed (SQL SELECT :5432)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-rng" target="l2-rds" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e18" value="provides container images (docker pull)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#FF9800;strokeWidth=1.5;dashed=1;fontSize=8;html=1;" edge="1" source="l2-ecr" target="l2-webui" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e19" value="emits metrics (Application Signals / OTEL)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E91E63;strokeWidth=1.5;dashed=1;fontSize=8;html=1;" edge="1" source="l2-hasher" target="l2-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e20" value="emits metrics (Application Signals / OTEL)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E91E63;strokeWidth=1.5;dashed=1;fontSize=8;html=1;" edge="1" source="l2-rng" target="l2-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e21" value="emits metrics (Application Signals / OTEL)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E91E63;strokeWidth=1.5;dashed=1;fontSize=8;html=1;" edge="1" source="l2-worker" target="l2-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <!-- ═══ VPC Endpoint Service (in Member 1 VPC) ═══ -->
+      <mxCell id="l2-vpc-endpoint-service" value="VPC Endpoint&lt;br&gt;Service" style="sketch=0;fontColor=#232F3E;fillColor=#8C4FFF;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1500" y="1000" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-vpc-endpoint-service" value="&amp;lt;&amp;lt;Networking&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1483" y="1065" width="82" height="18" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Member 2 Account Boundary ═══ -->
+      <mxCell id="l2-m2-bound-0" value="AWS Account 222222222222 (Member 2)" style="rounded=1;fillColor=none;strokeColor=#232F3E;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="2250" y="50" width="920" height="1500" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-m2-bound-1" value="VPC 10.1.0.0/16" style="rounded=1;fillColor=none;strokeColor=#1565C0;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="l2-m2-bound-0">
+        <mxGeometry x="20" y="30" width="880" height="700" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-m2-bound-2" value="EKS: devops-agent-test-m2-cluster" style="rounded=1;fillColor=none;strokeColor=#ED7100;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="l2-m2-bound-1">
+        <mxGeometry x="40" y="40" width="380" height="200" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-m2-eks-collapsed" value="EKS M2 Cluster" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eks;html=1;" vertex="1" parent="l2-m2-bound-2">
+        <mxGeometry x="40" y="50" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-m2-eks-collapsed" value="&amp;lt;&amp;lt;Cluster&amp;gt;&amp;gt;&lt;br&gt;dockercoins + dashboard" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-m2-bound-2">
+        <mxGeometry x="10" y="103" width="108" height="30" as="geometry"/>
+      </mxCell>
+      <!-- VPC Endpoint in Member 2 VPC -->
+      <mxCell id="l2-vpc-endpoint-interface" value="VPC Endpoint&lt;br&gt;(Interface)" style="sketch=0;fontColor=#232F3E;fillColor=#8C4FFF;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc;html=1;" vertex="1" parent="l2-m2-bound-1">
+        <mxGeometry x="500" y="100" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-vpc-endpoint-interface" value="&amp;lt;&amp;lt;Networking&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-m2-bound-1">
+        <mxGeometry x="486" y="165" width="76" height="18" as="geometry"/>
+      </mxCell>
+      <!-- RDS M2 in Member 2 VPC -->
+      <mxCell id="l2-m2-rds" value="RDS M2" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;html=1;" vertex="1" parent="l2-m2-bound-1">
+        <mxGeometry x="500" y="300" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-m2-rds" value="&amp;lt;&amp;lt;Persistence&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-m2-bound-1">
+        <mxGeometry x="486" y="353" width="76" height="18" as="geometry"/>
+      </mxCell>
+      <!-- IAM Roles (Account-level, outside VPC) -->
+      <mxCell id="l2-m2-devops-agent-xaccount-role" value="Agent&lt;br&gt;X-Account Role" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.iam;html=1;" vertex="1" parent="l2-m2-bound-0">
+        <mxGeometry x="200" y="800" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-m2-devops-agent-xaccount-role" value="&amp;lt;&amp;lt;Security&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-m2-bound-0">
+        <mxGeometry x="186" y="870" width="76" height="18" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-m2-dashboard-xaccount-role" value="Dashboard&lt;br&gt;X-Account Role" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.iam;html=1;" vertex="1" parent="l2-m2-bound-0">
+        <mxGeometry x="500" y="800" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-st-m2-dashboard-xaccount-role" value="&amp;lt;&amp;lt;Security&amp;gt;&amp;gt;" style="text;fontSize=9;fontColor=#666;fontStyle=2;align=center;html=1;" vertex="1" parent="l2-m2-bound-0">
+        <mxGeometry x="486" y="870" width="76" height="18" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Cross-Account Edges ═══ -->
+      <mxCell id="l2-e-m2-eks-to-vpce" value="서비스 요청 (TCP :80)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-m2-eks-collapsed" target="l2-vpc-endpoint-interface" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e-vpce-to-vpces" value="PrivateLink 터널 (AWS PrivateLink)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-vpc-endpoint-interface" target="l2-vpc-endpoint-service" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e-vpces-to-svc" value="NLB → K8s Service" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-vpc-endpoint-service" target="l2-webui-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e-agent-xacct" value="cross-account AssumeRole (sts:AssumeRole)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-agent-space" target="l2-m2-devops-agent-xaccount-role" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e-xacct-role-to-eks" value="EKS 읽기 전용 조사 (EKS Access Entry)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l2-m2-devops-agent-xaccount-role" target="l2-m2-eks-collapsed" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e-dashboard-xacct" value="cross-account AssumeRole (sts:AssumeRole)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l2-dashboard" target="l2-m2-dashboard-xaccount-role" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l2-e-dashboard-role-to-eks" value="dockercoins namespace 관리 (ClusterAdmin)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l2-m2-dashboard-xaccount-role" target="l2-m2-eks-collapsed" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Legend ═══ -->
+      <mxCell id="l2-legend" value="&lt;b&gt;Legend:&lt;/b&gt; &lt;font color=&quot;#1565C0&quot;&gt;── app_internal / PrivateLink&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#D32F2F&quot;&gt;-- fault_injection / X-Account&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#E65100&quot;&gt;── alarm_pipeline&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#2E7D32&quot;&gt;── investigation / X-Account&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#999999&quot;&gt;-- data_query&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#7B1FA2&quot;&gt;── llm_evaluation&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#E91E63&quot;&gt;-- observability&lt;/font&gt; &amp;nbsp; &lt;font color=&quot;#FF9800&quot;&gt;-- deployment&lt;/font&gt;" style="text;fontSize=9;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="1540" width="1500" height="30" as="geometry"/>
+      </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="L3 — EKS Resource View" id="l3-eks">
+    <mxGraphModel dx="2200" dy="1800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="l3eks-title" value="L3 — EKS Resource View" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="15" width="500" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-ns-dashboard-box" value="" style="rounded=1;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=1.5;arcSize=6;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="40" y="60" width="700" height="380" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-ns-dashboard-lbl" value="ns: dashboard" style="text;fontSize=10;fontStyle=1;fontColor=#E53935;html=1;" vertex="1" parent="l3eks-ns-dashboard-box">
+        <mxGeometry x="10" y="5" width="100" height="20" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-dashboard" value="Simulator" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dashboard-box">
+        <mxGeometry x="20" y="40" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-dashboard" value="&lt;b&gt;Simulator&lt;/b&gt;&lt;br&gt;image: ECR/dashboard:latest&lt;br&gt;cpu: 100m/200m &amp;nbsp; mem: 128Mi/256Mi&lt;br&gt;port: 8080 &amp;nbsp; replicas: 1&lt;br&gt;probes: readiness /health:8080:5s, liveness /health:8080:15s&lt;br&gt;cmd: gunicorn --bind 0.0.0.0:8080 --workers 1 --threads 8&lt;br&gt;sa: dashboard (IRSA → dashboard-role)&lt;br&gt;volumes: emptyDir: results" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dashboard-box">
+        <mxGeometry x="90" y="35" width="280" height="140" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-dashboard-svc" value="simulator-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dashboard-box">
+        <mxGeometry x="20" y="220" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-dashboard-svc" value="&lt;b&gt;simulator-svc&lt;/b&gt;&lt;br&gt;type: LoadBalancer &amp;nbsp; port: 80 → 8080&lt;br&gt;annotations: internal NLB" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#1565C0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dashboard-box">
+        <mxGeometry x="90" y="215" width="280" height="60" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-ns-dockercoins-box" value="" style="rounded=1;fillColor=#FFF8E1;strokeColor=#FF8F00;strokeWidth=1.5;arcSize=6;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="40" y="470" width="1420" height="830" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-ns-dockercoins-lbl" value="ns: dockercoins" style="text;fontSize=10;fontStyle=1;fontColor=#FF8F00;html=1;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="10" y="5" width="120" height="20" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-webui" value="WebUI" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="20" y="40" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-webui" value="&lt;b&gt;WebUI&lt;/b&gt;&lt;br&gt;image: ECR/webui:latest&lt;br&gt;cpu: 50m/200m &amp;nbsp; mem: 64Mi/128Mi&lt;br&gt;port: 80 &amp;nbsp; replicas: 1&lt;br&gt;otel: inject-nodejs &amp;nbsp; env: REDIS_HOST=redis&lt;br&gt;&lt;font color=&quot;#2E7D32&quot;&gt;📊 avg_latency: 3.31ms &amp;nbsp; p99: 31.64ms &amp;nbsp; req/s: 6480 &amp;nbsp; error: 0&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="90" y="35" width="260" height="90" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-worker" value="Worker" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="20" y="160" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-worker" value="&lt;b&gt;Worker&lt;/b&gt;&lt;br&gt;image: ECR/worker:latest&lt;br&gt;cpu: 50m/200m &amp;nbsp; mem: 64Mi/128Mi&lt;br&gt;replicas: 1 &amp;nbsp; otel: inject-python&lt;br&gt;env: REDIS_HOST=redis, RNG_HOST=rng, HASHER_HOST=hasher&lt;br&gt;&lt;font color=&quot;#2E7D32&quot;&gt;📊 avg_latency: 91.11ms &amp;nbsp; p99: 116.23ms &amp;nbsp; req/s: 79719 &amp;nbsp; error: 0&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="90" y="155" width="260" height="90" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-hasher" value="Hasher" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="730" y="40" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-hasher" value="&lt;b&gt;Hasher&lt;/b&gt;&lt;br&gt;image: ECR/hasher:20260408&lt;br&gt;cpu: 50m/200m &amp;nbsp; mem: 64Mi/128Mi&lt;br&gt;port: 80 &amp;nbsp; replicas: 1 &amp;nbsp; otel: inject-python&lt;br&gt;chaos: /config/cache, /clear-latency, /inject-latency, /crash, /oom&lt;br&gt;&lt;font color=&quot;#2E7D32&quot;&gt;📊 avg_latency: 92.45ms &amp;nbsp; p99: 106.65ms &amp;nbsp; req/s: 38127 &amp;nbsp; error: 0&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="800" y="35" width="260" height="90" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-rng" value="RNG" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="730" y="160" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-rng" value="&lt;b&gt;RNG&lt;/b&gt;&lt;br&gt;image: ECR/rng:20260408&lt;br&gt;cpu: 50m/200m &amp;nbsp; mem: 64Mi/128Mi&lt;br&gt;port: 80 &amp;nbsp; replicas: 1 &amp;nbsp; otel: inject-python&lt;br&gt;env: DB_HOST=rds-endpoint, DB_PORT=5432&lt;br&gt;chaos: /config/response, /db-leak, /db-flood, /crash, /oom, /cpu&lt;br&gt;&lt;font color=&quot;#2E7D32&quot;&gt;📊 avg_latency: 92.46ms &amp;nbsp; p99: 106.64ms &amp;nbsp; req/s: 38090 &amp;nbsp; error: 0&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="800" y="155" width="260" height="100" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-redis" value="Redis" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="730" y="290" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-redis" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;image: redis:7-alpine&lt;br&gt;cpu: 50m/100m &amp;nbsp; mem: 64Mi/128Mi&lt;br&gt;port: 6379 &amp;nbsp; replicas: 1 &amp;nbsp; in-cluster datastore" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="800" y="285" width="260" height="70" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-webui-svc" value="webui-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="20" y="290" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-webui-svc" value="&lt;b&gt;webui-svc&lt;/b&gt; LB:80→80 internal NLB" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#1565C0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="90" y="290" width="260" height="35" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-hasher-svc" value="hasher-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="730" y="395" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-hasher-svc" value="&lt;b&gt;hasher-svc&lt;/b&gt; ClusterIP:80→80" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#1565C0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="800" y="395" width="260" height="35" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-rng-svc" value="rng-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="730" y="455" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-rng-svc" value="&lt;b&gt;rng-svc&lt;/b&gt; ClusterIP:80→80" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#1565C0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="800" y="455" width="260" height="35" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-redis-svc" value="redis-svc" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=svc;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="730" y="515" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-redis-svc" value="&lt;b&gt;redis-svc&lt;/b&gt; ClusterIP:6379→6379" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#1565C0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="800" y="515" width="260" height="35" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-investigation-cleanup" value="cleanup" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=cronjob;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="20" y="380" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-investigation-cleanup" value="&lt;b&gt;investigation-cleanup&lt;/b&gt; */2 * * * * python:3.11-slim&lt;br&gt;Reset chaos endpoints on investigation completion" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="90" y="375" width="260" height="50" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-application-signals" value="App Signals" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=cm;fillColor=#326CE5;strokeColor=none;fontColor=#555;fontSize=8;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="20" y="470" width="40" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-application-signals" value="&lt;b&gt;Application Signals (OTEL)&lt;/b&gt;&lt;br&gt;exporter: cloudwatch-agent.amazon-cloudwatch:4316&lt;br&gt;sampler: xray &amp;nbsp; propagators: tracecontext, baggage, xray&lt;br&gt;python: adot-python:v0.12.1 &amp;nbsp; nodejs: adot-node:v0.7.0" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#5C6BC0;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;html=1;sketch=0;" vertex="1" parent="l3eks-ns-dockercoins-box">
+        <mxGeometry x="90" y="465" width="260" height="75" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-ns-kube-system-box" value="" style="rounded=1;fillColor=#F5F5F5;strokeColor=#9E9E9E;strokeWidth=1.5;arcSize=6;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="40" y="1340" width="700" height="200" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-ns-kube-system-lbl" value="ns: kube-system" style="text;fontSize=10;fontStyle=1;fontColor=#9E9E9E;html=1;" vertex="1" parent="l3eks-ns-kube-system-box">
+        <mxGeometry x="10" y="5" width="120" height="20" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-aws-lb-controller" value="AWS LB Controller" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="l3eks-ns-kube-system-box">
+        <mxGeometry x="20" y="40" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-card-aws-lb-controller" value="&lt;b&gt;AWS LB Controller&lt;/b&gt;&lt;br&gt;image: public.ecr.aws/eks/aws-lb-controller:v2.7.2&lt;br&gt;cpu: 100m/200m &amp;nbsp; mem: 200Mi/500Mi &amp;nbsp; replicas: 2&lt;br&gt;probes: readiness /readyz:61779:10s, liveness /healthz:61779:30s&lt;br&gt;sa: aws-load-balancer-controller (IRSA)" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="l3eks-ns-kube-system-box">
+        <mxGeometry x="90" y="35" width="280" height="90" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-cloudwatch" value="CloudWatch" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="80" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-agent-space" value="DevOps Agent" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.devops_agent;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="220" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-bedrock" value="Bedrock" style="sketch=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="360" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-dynamodb" value="DynamoDB" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="500" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-rds" value="RDS" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="640" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-ecr" value="ECR" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecr;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="780" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-c-fis" value="FIS" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fis;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="920" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e0" value="가설별 증거 수집 (GetLogEvents, GetMetricData) 로그·메트릭·트레이스" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-c-agent-space" target="l3eks-c-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e1" value="root cause 분석 요청 (InvokeModel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-c-agent-space" target="l3eks-c-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e2" value="조사 결과 조회 (Query/Scan) scenario_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;strokeWidth=1;dashed=1;fontSize=8;html=1;" edge="1" source="l3eks-dashboard" target="l3eks-c-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e3" value="5축 품질 평가 (LLM-as-Judge, InvokeModel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-dashboard" target="l3eks-c-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e4" value="posts hash request (POST /hash)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-worker" target="l3eks-hasher-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e5" value="requests random data (GET /32)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-worker" target="l3eks-rng-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e6" value="publishes mining results (LPUSH/INCR)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-worker" target="l3eks-redis-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e7" value="reads mining progress (HLEN/GET)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-webui" target="l3eks-redis-svc" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e8" value="queries random seed (SQL SELECT :5432)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-rng" target="l3eks-c-rds" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3eks-e9" value="분석 결과 저장 (PutItem)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3eks-c-bedrock" target="l3eks-c-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="L3 — Serverless Pipeline" id="l3-serverless">
+    <mxGraphModel dx="2200" dy="1800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="l3serverless-title" value="L3 — Serverless Pipeline" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="20" width="500" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-lambda-event-handler" value="Event Handler" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="1">
+        <mxGeometry x="60" y="80" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-card-lambda-event-handler" value="&lt;b&gt;Event Handler&lt;/b&gt;&lt;br&gt;runtime: Python 3.12&lt;br&gt;memory: 256 MB&lt;br&gt;timeout: 60s&lt;br&gt;handler: event_handler.lambda_handler&lt;br&gt;triggers: EventBridge rule: agent-lifecycle-events&lt;br&gt;env: TABLE_NAME=devops-agent-investigations" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="130" y="70" width="300" height="158" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-lambda-webhook-fwd" value="Webhook Fwd" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="1">
+        <mxGeometry x="60" y="298" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-card-lambda-webhook-fwd" value="&lt;b&gt;Webhook Fwd&lt;/b&gt;&lt;br&gt;runtime: Python 3.12&lt;br&gt;memory: 128 MB&lt;br&gt;timeout: 30s&lt;br&gt;handler: webhook_forwarder.lambda_handler&lt;br&gt;triggers: SNS subscription: alarm-topic&lt;br&gt;env: AGENT_WEBHOOK_URL=https://agent-space.endpoint/webhook" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="130" y="288" width="300" height="158" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-lambda-webhook-setup" value="Webhook Setup" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;html=1;" vertex="1" parent="1">
+        <mxGeometry x="60" y="516" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-card-lambda-webhook-setup" value="&lt;b&gt;Webhook Setup&lt;/b&gt;&lt;br&gt;runtime: Python 3.12&lt;br&gt;memory: 128 MB&lt;br&gt;timeout: 30s&lt;br&gt;handler: webhook_setup.lambda_handler&lt;br&gt;triggers: Manual / CloudFormation Custom Resource&lt;br&gt;env: AGENT_ID, SECRET_ARN" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="130" y="506" width="300" height="158" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-sns" value="SNS" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;html=1;" vertex="1" parent="1">
+        <mxGeometry x="60" y="734" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-card-sns" value="&lt;b&gt;SNS&lt;/b&gt;&lt;br&gt;topic: devops-agent-alarm-topic&lt;br&gt;protocol: Lambda subscription&lt;br&gt;targets: lambda-webhook-fwd" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="130" y="724" width="300" height="104" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-eventbridge" value="EventBridge" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;html=1;" vertex="1" parent="1">
+        <mxGeometry x="60" y="898" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-card-eventbridge" value="&lt;b&gt;EventBridge&lt;/b&gt;&lt;br&gt;bus: default&lt;br&gt;rule: agent-lifecycle-events&lt;br&gt;pattern: source: devops-agent, detail-type: investigation.*&lt;br&gt;targets: lambda-event-handler" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#FF8F00;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="130" y="888" width="300" height="122" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-c-cloudwatch" value="CloudWatch" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="80" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-c-agent-space" value="DevOps Agent" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.devops_agent;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="200" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-c-dynamodb" value="DynamoDB" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="320" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-c-dashboard" value="Simulator" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="440" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e0" value="Alarm → SNS topic 발행 (SNS Publish)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-c-cloudwatch" target="l3serverless-sns" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e1" value="Lambda 구독 매칭 → invoke (Lambda invoke)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-sns" target="l3serverless-lambda-webhook-fwd" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e2" value="알람 JSON → POST /webhook 전달 (POST /webhook)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-lambda-webhook-fwd" target="l3serverless-c-agent-space" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e3" value="가설별 증거 수집 (로그·메트릭·트레이스) (GetLogEvents, GetMetricData)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-c-agent-space" target="l3serverless-c-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e4" value="investigation.started/.completed 이벤트 발행 (PutEvents)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-c-agent-space" target="l3serverless-eventbridge" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e5" value="이벤트 규칙 매칭 → Lambda 호출 (Lambda invoke)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-eventbridge" target="l3serverless-lambda-event-handler" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e6" value="조사 결과 저장 (findings, severity, remediation) (PutItem)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3serverless-lambda-event-handler" target="l3serverless-c-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3serverless-e7" value="scenario_id로 조사 결과 조회 (Query/Scan)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;strokeWidth=1;dashed=1;fontSize=8;html=1;" edge="1" source="l3serverless-c-dashboard" target="l3serverless-c-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="L3 — AI Investigation Pipeline" id="l3-ai">
+    <mxGraphModel dx="2200" dy="1800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="l3ai-title" value="L3 — AI Investigation Pipeline" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="20" width="500" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-box-agent-space" value="DevOps Agent &amp;lt;&amp;lt;Orchestrator&amp;gt;&amp;gt;" style="rounded=1;fillColor=none;strokeColor=#E7157B;strokeWidth=2;dashed=0;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=65;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="60" y="80" width="500" height="520" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-icon-agent-space" value="" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.devops_agent;html=1;" vertex="1" parent="l3ai-box-agent-space">
+        <mxGeometry x="10" y="10" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-agent-space-input" value="Input" style="rounded=1;fillColor=#E8F5E9;strokeColor=#43A047;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-agent-space">
+        <mxGeometry x="10" y="70" width="480" height="58" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-agent-space-Webhook In" value="Webhook Interface — POST /webhook — SNS → Lambda route, HMAC-SHA256 signature auth" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-agent-space-input">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-agent-space-processing" value="Processing" style="rounded=1;fillColor=#E3F2FD;strokeColor=#1E88E5;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-agent-space">
+        <mxGeometry x="10" y="148" width="480" height="86" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-agent-space-Reasoning " value="Reasoning Engine — Claude via Bedrock InvokeModel — alarm context analysis" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-agent-space-processing">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-agent-space-Tool Invok" value="Tool Invoker — CloudWatch Logs/Metrics, EKS kubectl, FIS experiments" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-agent-space-processing">
+        <mxGeometry x="10" y="49" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-agent-space-output" value="Output" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FF9800;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-agent-space">
+        <mxGeometry x="10" y="254" width="480" height="58" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-agent-space-Lifecycle " value="Lifecycle Manager — EventBridge events (started/completed/failed) + DynamoDB storage + Slack thread reports" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-agent-space-output">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-fields-agent-space" value="&lt;b&gt;Config&lt;/b&gt;&lt;br&gt;type: Managed DevOps Agent&lt;br&gt;model: Claude (Bedrock)&lt;br&gt;tools: CloudWatch Logs, Metrics, EKS kubectl, FIS&lt;br&gt;webhook: POST /webhook (SNS → Lambda → Agent)&lt;br&gt;lifecycle: EventBridge: investigation.started/completed/failed&lt;br&gt;storage: DynamoDB: investigation results + evidence" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#E7157B;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;html=1;" vertex="1" parent="l3ai-box-agent-space">
+        <mxGeometry x="10" y="332" width="480" height="126" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-box-bedrock" value="Bedrock &amp;lt;&amp;lt;AI:Reasoning&amp;gt;&amp;gt;" style="rounded=1;fillColor=none;strokeColor=#01A88D;strokeWidth=2;dashed=0;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=65;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="60" y="660" width="500" height="440" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-icon-bedrock" value="" style="sketch=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;html=1;" vertex="1" parent="l3ai-box-bedrock">
+        <mxGeometry x="10" y="10" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-bedrock-input" value="Input" style="rounded=1;fillColor=#E8F5E9;strokeColor=#43A047;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-bedrock">
+        <mxGeometry x="10" y="70" width="480" height="58" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-bedrock-Model Endp" value="Model Endpoint — InvokeModel API (Converse) — receives alarm context + tool results" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-bedrock-input">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-bedrock-processing" value="Processing" style="rounded=1;fillColor=#E3F2FD;strokeColor=#1E88E5;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-bedrock">
+        <mxGeometry x="10" y="148" width="480" height="58" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-bedrock-Claude Rea" value="Claude Reasoning — Claude 3.5 Sonnet — root cause analysis, remediation suggestions" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-bedrock-processing">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-bedrock-output" value="Output" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FF9800;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-bedrock">
+        <mxGeometry x="10" y="226" width="480" height="58" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-bedrock-Response F" value="Response Formatter — Structured JSON output with findings, evidence, severity, remediation steps" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-bedrock-output">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-fields-bedrock" value="&lt;b&gt;Config&lt;/b&gt;&lt;br&gt;model: Claude 3.5 Sonnet (anthropic.claude-3-5-sonnet)&lt;br&gt;region: us-east-1&lt;br&gt;invocation: InvokeModel API (converse)&lt;br&gt;input: alarm context, logs, metrics, K8s state&lt;br&gt;output: root cause analysis, remediation steps&lt;br&gt;guardrails: max tokens, content filter" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#01A88D;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;html=1;" vertex="1" parent="l3ai-box-bedrock">
+        <mxGeometry x="10" y="304" width="480" height="126" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-box-dynamodb" value="DynamoDB &amp;lt;&amp;lt;Persistence&amp;gt;&amp;gt;" style="rounded=1;fillColor=none;strokeColor=#C925D1;strokeWidth=2;dashed=0;fontSize=11;fontStyle=1;verticalAlign=top;align=left;spacingLeft=65;spacingTop=5;html=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <mxGeometry x="60" y="1160" width="500" height="440" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-icon-dynamodb" value="" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;html=1;" vertex="1" parent="l3ai-box-dynamodb">
+        <mxGeometry x="10" y="10" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-dynamodb-input" value="Input" style="rounded=1;fillColor=#E8F5E9;strokeColor=#43A047;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-dynamodb">
+        <mxGeometry x="10" y="70" width="480" height="86" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-dynamodb-Investigat" value="Investigation Events Table — PutItem from Lambda event handler — lifecycle events (started/completed/failed)" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-dynamodb-input">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-dynamodb-Scenario R" value="Scenario Runs Table — PutItem from Simulator — scenario execution results + verification steps" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-dynamodb-input">
+        <mxGeometry x="10" y="49" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-sec-dynamodb-output" value="Output" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FF9800;fontSize=9;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;html=1;container=1;collapsible=0;" vertex="1" parent="l3ai-box-dynamodb">
+        <mxGeometry x="10" y="176" width="480" height="58" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-comp-dynamodb-Query Inte" value="Query Interface — Query/Scan from Simulator — investigation results with GSI on scenario_id" style="text;fontSize=8;html=1;" vertex="1" parent="l3ai-sec-dynamodb-output">
+        <mxGeometry x="10" y="22" width="460" height="25" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-fields-dynamodb" value="&lt;b&gt;Config&lt;/b&gt;&lt;br&gt;table: devops-agent-investigations&lt;br&gt;partition_key: investigation_id (S)&lt;br&gt;sort_key: timestamp (N)&lt;br&gt;billing: PAY_PER_REQUEST&lt;br&gt;gsi: scenario_id-index&lt;br&gt;ttl: expiry_at" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#C925D1;strokeWidth=1;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;html=1;" vertex="1" parent="l3ai-box-dynamodb">
+        <mxGeometry x="10" y="254" width="480" height="126" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-c-cloudwatch" value="CloudWatch" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="80" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-c-dashboard" value="Simulator" style="shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;fillColor=#326CE5;strokeColor=none;fontColor=#232F3E;fontStyle=1;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="200" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-c-rds" value="RDS" style="sketch=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="320" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-c-sns" value="SNS" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1550" y="440" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-e0" value="Alarm → SNS topic 발행 (SNS Publish)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3ai-c-cloudwatch" target="l3ai-c-sns" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-e1" value="가설별 증거 수집 (로그·메트릭·트레이스) (GetLogEvents, GetMetricData)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3ai-box-agent-space" target="l3ai-c-cloudwatch" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-e2" value="알람 컨텍스트 + 증거 → root cause 분석 요청 (InvokeModel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3ai-box-agent-space" target="l3ai-box-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-e3" value="scenario_id로 조사 결과 조회 (Query/Scan)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;strokeWidth=1;dashed=1;fontSize=8;html=1;" edge="1" source="l3ai-c-dashboard" target="l3ai-box-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-e4" value="5축 품질 평가 (root_cause 30%, data_sources 20%...) (LLM-as-Judge, InvokeModel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B1FA2;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3ai-c-dashboard" target="l3ai-box-bedrock" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3ai-e5" value="분석 결과 저장 (findings, evidence, remediation steps) (PutItem)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3ai-box-bedrock" target="l3ai-box-dynamodb" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="L3 — Cross-Account Networking" id="l3-cross-account">
+    <mxGraphModel dx="2200" dy="1800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="l3xa-title" value="L3 — Cross-Account Networking" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="15" width="500" height="30" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Focal Zone: Detail Cards ═══ -->
+      <!-- VPC Endpoint Service (Member 1) -->
+      <mxCell id="l3xa-vpces-icon" value="VPC Endpoint&lt;br&gt;Service" style="sketch=0;fontColor=#232F3E;fillColor=#8C4FFF;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="80" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-card-vpces" value="&lt;b&gt;VPC Endpoint Service&lt;/b&gt; &amp;lt;&amp;lt;Networking&amp;gt;&amp;gt;&lt;br&gt;&lt;br&gt;type: VPC Endpoint Service (Interface)&lt;br&gt;acceptance: false (auto-accept)&lt;br&gt;nlb: K8s LoadBalancer Service NLB&lt;br&gt;allowed_principals: arn:aws:iam::222222222222:root&lt;br&gt;sg_ingress: TCP 80 from VPC CIDR (10.0.0.0/16)&lt;br&gt;&lt;br&gt;&lt;i&gt;Member 1 Account (111111111111)&lt;/i&gt;&lt;br&gt;Exposes K8s NLB-backed services for cross-account consumption" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#8C4FFF;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="110" y="60" width="320" height="170" as="geometry"/>
+      </mxCell>
+      <!-- VPC Endpoint Interface (Member 2) -->
+      <mxCell id="l3xa-vpce-icon" value="VPC Endpoint&lt;br&gt;(Interface)" style="sketch=0;fontColor=#232F3E;fillColor=#8C4FFF;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="300" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-card-vpce" value="&lt;b&gt;VPC Interface Endpoint&lt;/b&gt; &amp;lt;&amp;lt;Networking&amp;gt;&amp;gt;&lt;br&gt;&lt;br&gt;type: VPC Interface Endpoint&lt;br&gt;private_dns: false&lt;br&gt;subnets: Member 2 private subnets (same AZ as provider NLB)&lt;br&gt;sg: TCP 80 from Member 2 VPC CIDR (10.1.0.0/16)&lt;br&gt;&lt;br&gt;&lt;i&gt;Member 2 Account (222222222222)&lt;/i&gt;&lt;br&gt;Creates private IP addresses routing to Member 1 NLB via PrivateLink" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#8C4FFF;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="110" y="280" width="320" height="170" as="geometry"/>
+      </mxCell>
+      <!-- Agent X-Account Role -->
+      <mxCell id="l3xa-agent-role-icon" value="Agent&lt;br&gt;X-Account Role" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.iam;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="520" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-card-agent-role" value="&lt;b&gt;Agent X-Account Role&lt;/b&gt; &amp;lt;&amp;lt;Security&amp;gt;&amp;gt;&lt;br&gt;&lt;br&gt;role: devops-agent-test-m2-devops-agent-xaccount-role&lt;br&gt;trust: aidevops.amazonaws.com (SourceAccount: 111111111111)&lt;br&gt;managed_policy: AIDevOpsAgentAccessPolicy&lt;br&gt;eks_access: AmazonEKSViewPolicy (cluster-wide)&lt;br&gt;cluster: devops-agent-test-m2-cluster&lt;br&gt;&lt;br&gt;&lt;i&gt;Member 2 Account (222222222222)&lt;/i&gt;&lt;br&gt;Enables Member 1 DevOps Agent to investigate Member 2 EKS" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#DD344C;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="110" y="500" width="320" height="180" as="geometry"/>
+      </mxCell>
+      <!-- Dashboard X-Account Role -->
+      <mxCell id="l3xa-dashboard-role-icon" value="Dashboard&lt;br&gt;X-Account Role" style="sketch=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.iam;html=1;" vertex="1" parent="1">
+        <mxGeometry x="40" y="750" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-card-dashboard-role" value="&lt;b&gt;Dashboard X-Account Role&lt;/b&gt; &amp;lt;&amp;lt;Security&amp;gt;&amp;gt;&lt;br&gt;&lt;br&gt;role: devops-agent-test-m2-dashboard-xaccount-role&lt;br&gt;trust: arn:aws:iam::111111111111:role/devops-agent-test-dashboard-role&lt;br&gt;eks_access: AmazonEKSClusterAdminPolicy (namespace: dockercoins)&lt;br&gt;cluster: devops-agent-test-m2-cluster&lt;br&gt;permissions: eks:DescribeCluster&lt;br&gt;&lt;br&gt;&lt;i&gt;Member 2 Account (222222222222)&lt;/i&gt;&lt;br&gt;Enables Member 1 Dashboard to manage Member 2 dockercoins" style="rounded=1;whiteSpace=wrap;fillColor=#FFF;strokeColor=#DD344C;strokeWidth=1;fontSize=8;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;spacingRight=6;html=1;sketch=0;" vertex="1" parent="1">
+        <mxGeometry x="110" y="730" width="320" height="180" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Collapsed Zone (right sidebar) ═══ -->
+      <mxCell id="l3xa-c-agent-space" value="DevOps Agent" style="sketch=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.devops_agent;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="80" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-ann-agent" value="Member 1 — orchestrates investigation&lt;br&gt;across both accounts" style="text;fontSize=8;fontColor=#888;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1660" y="90" width="180" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-c-dashboard" value="Simulator" style="sketch=0;fontColor=#232F3E;fillColor=#326CE5;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.kubernetes.icon2;kubernetesLabel=1;prIcon=deploy;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="200" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-ann-dashboard" value="Member 1 — manages fault injection&lt;br&gt;in both accounts via AssumeRole" style="text;fontSize=8;fontColor=#888;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1660" y="210" width="180" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-c-m2-eks" value="EKS M2 Cluster" style="sketch=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=none;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eks;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1600" y="320" width="48" height="48" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-ann-m2-eks" value="Member 2 — target cluster for&lt;br&gt;cross-account investigation &amp;amp; mgmt" style="text;fontSize=8;fontColor=#888;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1660" y="330" width="180" height="30" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-c-dockercoins" value="DockerCoins" style="rounded=1;whiteSpace=wrap;fillColor=#FFF8E1;strokeColor=#FF8F00;strokeWidth=1;fontSize=10;fontStyle=1;verticalAlign=middle;align=center;arcSize=12;sketch=0;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1585" y="450" width="100" height="40" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-ann-dockercoins" value="Member 1 — services exposed&lt;br&gt;via VPC Endpoint Service + NLB" style="text;fontSize=8;fontColor=#888;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxGeometry x="1660" y="495" width="180" height="30" as="geometry"/>
+      </mxCell>
+      <!-- ═══ Edges ═══ -->
+      <mxCell id="l3xa-e-vpce-tunnel" value="PrivateLink 터널 (AWS PrivateLink)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3xa-card-vpce" target="l3xa-card-vpces" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-e-agent-to-role" value="cross-account AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3xa-c-agent-space" target="l3xa-card-agent-role" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-e-role-to-eks" value="EKS 읽기 전용 조사" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3xa-card-agent-role" target="l3xa-c-m2-eks" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-e-dashboard-to-role" value="cross-account AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l3xa-c-dashboard" target="l3xa-card-dashboard-role" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-e-dashboard-role-to-eks" value="dockercoins namespace 관리" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;strokeWidth=2;dashed=1;fontSize=8;html=1;" edge="1" source="l3xa-card-dashboard-role" target="l3xa-c-m2-eks" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      <mxCell id="l3xa-e-vpces-to-dockercoins" value="NLB → K8s Service" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;fontSize=8;html=1;" edge="1" source="l3xa-card-vpces" target="l3xa-c-dockercoins" parent="1">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

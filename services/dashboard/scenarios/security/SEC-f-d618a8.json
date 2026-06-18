@@ -1,0 +1,78 @@
+{
+  "id": "SEC-f-d618a8",
+  "name": "Remote Code Execution via Unauthenticated Scenario Restore OS Command Injection",
+  "description": "The Flask Dashboard application at http://dashboard.example-domain.com contains a critical OS command injection vulnerability through the scenario restore mechanism. An unauthenticated attacker can create a scenario with an arbitrary shell command in the `restore.command` field via POST /api/arch/save-scenario, start a run via POST /api/scenario-run/<scenario_id>, and then trigger execution of that command via POST /api/scenario-run/<run_id>/restore. The user-controlled restore.command value is passed directly to subprocess.run(['bash', '-c', cmd]) without any authentication, authorization, or input sanitization. The command executes as root (uid=0) in a bash shell context, and the output is returned directly in the HTTP response. This constitutes OS-level command injection rather than application-language code injection, as the attacker-supplied input is interpreted by the bash shell (not the Python interpreter), enabling arbitrary system command execution.",
+  "category": "security-DockerCoins",
+  "app_name": "DockerCoins",
+  "layer": "app",
+  "target_service": "DockerCoins",
+  "failure_mode": "COMMAND_INJECTION",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "COMMAND_INJECTION 취약점 — Remote Code Execution via Unauthenticated Scenario Restore OS Command Injection",
+  "source": "security-agent",
+  "finding_id": "f-d618a80a-1fa1-496f-b346-fca2a7da2031",
+  "risk_level": "CRITICAL",
+  "risk_type": "COMMAND_INJECTION",
+  "endpoint": "http://dashboard.example-domain.com/api/arch",
+  "attack_steps": [
+    {
+      "method": "POST",
+      "path": "/api/arch/save-scenario",
+      "headers": {},
+      "body": "{\"scenario\": {\"id\": \"sec-validation-rce-002\", \"name\": \"Security Validation Test 2\", \"category\": \"application\", \"layer\": \"application\", \"purpose\": \"Security testing\", \"target_service\": \"hasher\", \"source\": \"manual\", \"skill_version\": \"2.1\", \"trigger_mode\": \"reactive\", \"trigger\": {\"type\": \"shell\", \"command\": \"echo trigger_only\"}",
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/sec-validation-rce-002",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/6411b996/restore",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/bfec6da8/restore",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "dashboard",
+      "label": "/api/arch/save-scenario"
+    }
+  ],
+  "registered_at": "2026-05-15T07:41:22.998064+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: COMMAND_INJECTION on dashboard\n# Endpoint: http://dashboard.example-domain.com/api/arch/api/arch/save-scenario"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "COMMAND_INJECTION 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  },
+  "devops_space_id": "4c035899-a296-49b2-b524-ba81d1256f43"
+}

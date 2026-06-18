@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조사 흐름 DAG v5 - SVG</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+h2 { color: #38bdf8; margin-bottom: 12px; font-size: 0.85rem; }
+.wrap { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; }
+.controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+button { padding: 5px 12px; background: #334155; color: #e2e8f0; border: none; border-radius: 5px; cursor: pointer; font-size: 0.75rem; }
+button:hover { background: #475569; }
+.svg-container { overflow: auto; cursor: grab; }
+.svg-container:active { cursor: grabbing; }
+svg text { font-family: -apple-system, sans-serif; }
+/* 노드 스타일 */
+.node-alarm rect { fill: #1e293b; stroke: #38bdf8; stroke-width: 1.5; rx: 6; }
+.node-triage rect { fill: #2d1a2d; stroke: #a855f7; stroke-width: 1.5; }
+.node-hyp-confirmed rect { fill: #14532d; stroke: #22c55e; stroke-width: 2; }
+.node-hyp-rejected rect { fill: #450a0a; stroke: #ef4444; stroke-width: 1.5; }
+.node-hyp-partial rect { fill: #422006; stroke: #f59e0b; stroke-width: 1.5; }
+.node-src rect { fill: #0f172a; stroke: #334155; stroke-width: 1; }
+.node-src-key rect { fill: #0f172a; stroke: #f59e0b; stroke-width: 1.5; }
+.node-result-ok rect { fill: #14532d; stroke: #22c55e; stroke-width: 2; }
+.node-result-fail rect { fill: #450a0a; stroke: #ef4444; stroke-width: 1.5; }
+.node-root rect { fill: #14532d; stroke: #22c55e; stroke-width: 2.5; }
+/* 엣지 */
+.edge { fill: none; stroke: #334155; stroke-width: 1.2; marker-end: url(#arrow); }
+.edge-key { fill: none; stroke: #f59e0b; stroke-width: 1.5; stroke-dasharray: 4,2; marker-end: url(#arrow-key); }
+.edge-confirm { fill: none; stroke: #22c55e; stroke-width: 1.5; marker-end: url(#arrow-ok); }
+.edge-reject { fill: none; stroke: #ef4444; stroke-width: 1.2; stroke-dasharray: 3,2; marker-end: url(#arrow-fail); }
+</style>
+</head>
+<body>
+<h2>조사 흐름 DAG — 데이터소스 → 가설 → 근거 → 결과</h2>
+<div class="controls">
+    <button onclick="zoom(1.2)">+ 확대</button>
+    <button onclick="zoom(0.8)">- 축소</button>
+    <button onclick="resetZoom()">리셋</button>
+    <button onclick="openFull()">↗ 전체화면</button>
+    <span style="font-size:0.7rem;color:#64748b;">노드 위에 마우스를 올리면 상세 내용이 표시됩니다</span>
+</div>
+<div class="wrap">
+    <div class="svg-container" id="svgWrap">
+        <svg id="dag" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+</div>
+<div id="tooltip" style="display:none;position:fixed;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:0.75rem;max-width:300px;z-index:100;pointer-events:none;"></div>
+
+<script>
+var scale = 1;
+var DATA = {
+    alarm: { id:'alarm', label:'hasher-errors\nALARM', sub:'09:49 Error 39건', type:'alarm' },
+    triage: { id:'triage', label:'Triage\n증상 분류', sub:'symptom 기록', type:'triage' },
+    hypotheses: [
+        {
+            id:'h1', label:'가설1\n인프라/배포 변경', type:'rejected',
+            reason:'CloudTrail 변경 없음\n배포 이력 없음',
+            steps: [
+                { id:'h1s1', src:'CloudTrail', label:'CloudTrail\n인프라 조회', insight:'hasher/rng 변경 없음', is_key:false },
+                { id:'h1s2', src:'CloudTrail', label:'배포 이력\n확인', insight:'dashboard만 배포, hasher/rng 미배포', is_key:false }
+            ]
+        },
+        {
+            id:'h2', label:'가설2\nRNG 데이터 오염', type:'confirmed',
+            reason:'RNG quality=degraded API 호출\n→ 50% 빈 데이터 반환\n→ Worker 무검증 전달\n→ Hasher 400 에러',
+            steps: [
+                { id:'h2s1', src:'메트릭', label:'메트릭\nError 분석', insight:'Hasher Error 급증, RNG Error 0\n(HTTP 200으로 빈 데이터)', is_key:false },
+                { id:'h2s2', src:'로그', label:'RNG 로그\n분석', insight:'09:49:22 quality=degraded\n설정 변경 감지', is_key:true },
+                { id:'h2s3', src:'로그', label:'Hasher 로그\n분석', insight:'09:49:25부터 Validation failed:\nEmpty input 209건', is_key:true },
+                { id:'h2s4', src:'트레이스', label:'X-Ray\n트레이스', insight:'35건 에러 동일 패턴:\nEmpty input received', is_key:false },
+                { id:'h2s5', src:'코드', label:'RNG 코드\n분석', insight:'rng.py:76-82\n_response_quality_factor=0.5\n→ 50% 빈 바이트 반환', is_key:true },
+                { id:'h2s6', src:'코드', label:'Worker 코드\n분석', insight:'worker.py:23-25\nRNG 응답 검증 없이 전달', is_key:false }
+            ]
+        },
+        {
+            id:'h3', label:'가설3\nHasher OOMKill', type:'rejected',
+            reason:'OOMKill은 알람 2.5시간 전\n시간적으로 무관',
+            steps: [
+                { id:'h3s1', src:'K8s', label:'K8s Pod\n상태 확인', insight:'OOMKilled 4회\n마지막 07:28 (알람 09:50 기준 2.5시간 전)', is_key:false },
+                { id:'h3s2', src:'메트릭', label:'메모리\n메트릭', insight:'에러 발생 시점 메모리 이상 없음', is_key:false }
+            ]
+        }
+    ],
+    root: { id:'root', label:'Root Cause\n확정', sub:'RNG 런타임 API 호출\n→ 데이터 품질 저하\n→ 연쇄 장애' }
+};
+
+// 레이아웃 계산
+var NW = 110, NH = 44, PAD = 14, COL_GAP = 80, ROW_GAP = 14;
+var positions = {};
+
+function calcLayout() {
+    var x = PAD;
+    // Col 0: 알람
+    positions['alarm'] = { x: x + NW/2, y: 200 };
+    x += NW + COL_GAP;
+    // Col 1: Triage
+    positions['triage'] = { x: x + NW/2, y: 200 };
+    x += NW + COL_GAP;
+    // Col 2: 가설들
+    var hypY = [80, 220, 380];
+    DATA.hypotheses.forEach(function(h, i) {
+        positions[h.id] = { x: x + NW/2, y: hypY[i] };
+    });
+    x += NW + COL_GAP;
+    // Col 3: 스텝들 (가설별)
+    DATA.hypotheses.forEach(function(h, hi) {
+        var baseY = hypY[hi] - (h.steps.length - 1) * (NH + ROW_GAP) / 2;
+        h.steps.forEach(function(st, si) {
+            positions[st.id] = { x: x + NW/2, y: baseY + si * (NH + ROW_GAP) };
+        });
+    });
+    x += NW + COL_GAP;
+    // Col 4: 결과 (기각/확인)
+    DATA.hypotheses.forEach(function(h, i) {
+        positions[h.id + '_result'] = { x: x + NW/2, y: hypY[i] };
+    });
+    x += NW + COL_GAP;
+    // Col 5: Root Cause
+    positions['root'] = { x: x + NW/2, y: 220 };
+    return x + NW + PAD;
+}
+
+function drawNode(svg, id, label, sub, cls, tooltip) {
+    var p = positions[id];
+    if (!p) return;
+    var lines = label.split('\n');
+    var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', cls);
+    g.setAttribute('transform', 'translate(' + (p.x - NW/2) + ',' + (p.y - NH/2) + ')');
+    if (tooltip) {
+        g.style.cursor = 'pointer';
+        g.addEventListener('mouseenter', function(e) { showTip(e, tooltip); });
+        g.addEventListener('mousemove', function(e) { moveTip(e); });
+        g.addEventListener('mouseleave', hideTip);
+    }
+    var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', NW); rect.setAttribute('height', NH);
+    rect.setAttribute('rx', 6);
+    g.appendChild(rect);
+    lines.forEach(function(line, i) {
+        var t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t.setAttribute('x', NW/2);
+        t.setAttribute('y', (sub ? 14 : 18) + i * 13);
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '10');
+        t.setAttribute('fill', '#e2e8f0');
+        t.setAttribute('font-weight', i === 0 ? '600' : '400');
+        t.textContent = line;
+        g.appendChild(t);
+    });
+    if (sub) {
+        var s = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        s.setAttribute('x', NW/2);
+        s.setAttribute('y', NH - 6);
+        s.setAttribute('text-anchor', 'middle');
+        s.setAttribute('font-size', '8');
+        s.setAttribute('fill', '#64748b');
+        s.textContent = sub.split('\n')[0];
+        g.appendChild(s);
+    }
+    svg.appendChild(g);
+}
+
+function drawEdge(svg, fromId, toId, cls) {
+    var f = positions[fromId], t = positions[toId];
+    if (!f || !t) return;
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    var fx = f.x + NW/2, fy = f.y;
+    var tx = t.x - NW/2, ty = t.y;
+    var mx = (fx + tx) / 2;
+    var d = 'M ' + fx + ' ' + fy + ' C ' + mx + ' ' + fy + ', ' + mx + ' ' + ty + ', ' + tx + ' ' + ty;
+    path.setAttribute('d', d);
+    path.setAttribute('class', cls || 'edge');
+    svg.appendChild(path);
+}
+
+function render() {
+    var totalW = calcLayout();
+    var totalH = 500;
+    var svg = document.getElementById('dag');
+    svg.innerHTML = '';
+    svg.setAttribute('width', totalW * scale);
+    svg.setAttribute('height', totalH * scale);
+    svg.setAttribute('viewBox', '0 0 ' + totalW + ' ' + totalH);
+
+    // 마커 정의
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    [['arrow','#334155'],['arrow-key','#f59e0b'],['arrow-ok','#22c55e'],['arrow-fail','#ef4444']].forEach(function(m) {
+        var mk = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+        mk.setAttribute('id', m[0]); mk.setAttribute('markerWidth','6'); mk.setAttribute('markerHeight','6');
+        mk.setAttribute('refX','5'); mk.setAttribute('refY','3'); mk.setAttribute('orient','auto');
+        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d','M0,0 L0,6 L6,3 z'); path.setAttribute('fill', m[1]);
+        mk.appendChild(path); defs.appendChild(mk);
+    });
+    svg.appendChild(defs);
+
+    // 엣지 먼저 (노드 아래)
+    drawEdge(svg, 'alarm', 'triage', 'edge');
+    DATA.hypotheses.forEach(function(h) {
+        drawEdge(svg, 'triage', h.id, 'edge');
+        h.steps.forEach(function(st) {
+            drawEdge(svg, h.id, st.id, st.is_key ? 'edge-key' : 'edge');
+            drawEdge(svg, st.id, h.id + '_result', st.is_key ? 'edge-key' : 'edge');
+        });
+        if (h.type === 'confirmed') {
+            drawEdge(svg, h.id + '_result', 'root', 'edge-confirm');
+        }
+    });
+
+    // 노드
+    drawNode(svg, 'alarm', DATA.alarm.label, DATA.alarm.sub, 'node-alarm', '알람: hasher-errors\n09:49에 Error 39건 발생\n임계값: 5.0');
+    drawNode(svg, 'triage', DATA.triage.label, DATA.triage.sub, 'node-triage', 'Triage: 증상 분류\n알람 상태 확인 및 아키텍처 이해\n병렬 조사 작업 생성');
+    DATA.hypotheses.forEach(function(h) {
+        var cls = h.type === 'confirmed' ? 'node-hyp-confirmed' : h.type === 'rejected' ? 'node-hyp-rejected' : 'node-hyp-partial';
+        drawNode(svg, h.id, h.label, null, cls, h.label.replace('\n',': ') + '\n\n' + h.reason);
+        h.steps.forEach(function(st) {
+            drawNode(svg, st.id, st.label, null, st.is_key ? 'node-src-key' : 'node-src', '[' + st.src + ']\n' + st.insight);
+        });
+        var resultLabel = h.type === 'confirmed' ? '✓ 확인\n근거 충분' : '✗ 기각\n' + h.reason.split('\n')[0];
+        var resultCls = h.type === 'confirmed' ? 'node-result-ok' : 'node-result-fail';
+        drawNode(svg, h.id + '_result', resultLabel, null, resultCls, h.reason);
+    });
+    drawNode(svg, 'root', DATA.root.label, null, 'node-root', 'Root Cause:\n' + DATA.root.sub);
+}
+
+function zoom(f) { scale *= f; render(); }
+function resetZoom() { scale = 1; render(); }
+function openFull() {
+    var w = window.open('', '_blank');
+    w.document.write('<html><body style="margin:0;background:#0f172a;">' + document.getElementById('dag').outerHTML + '</body></html>');
+}
+
+function showTip(e, text) {
+    var tip = document.getElementById('tooltip');
+    tip.innerHTML = text.replace(/\n/g,'<br>');
+    tip.style.display = 'block';
+    moveTip(e);
+}
+function moveTip(e) {
+    var tip = document.getElementById('tooltip');
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 10) + 'px';
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+render();
+</script>
+</body>
+</html>

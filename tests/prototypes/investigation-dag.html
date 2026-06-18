@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Investigation DAG — 가설 탐색 경로 실시간 시각화</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; height: 100vh; }
+
+.header { padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1e293b; }
+.header h1 { font-size: 0.9rem; color: #38bdf8; font-weight: 600; }
+.controls { display: flex; gap: 6px; }
+.controls button { padding: 4px 10px; background: #334155; color: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
+.controls button:hover { background: #475569; }
+.controls button.active { background: #0ea5e9; color: #fff; }
+.speed-control { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
+.speed-control label { font-size: 0.65rem; color: #94a3b8; }
+.speed-control input { width: 60px; }
+.legend { display: flex; gap: 12px; margin-left: auto; font-size: 0.65rem; color: #94a3b8; }
+.legend span { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.main { display: flex; height: calc(100vh - 49px); }
+.dag-area { flex: 1; overflow: auto; position: relative; }
+.detail-panel { width: 340px; background: #1e293b; border-left: 1px solid #334155; overflow-y: auto; padding: 16px; display: none; }
+.detail-panel.open { display: block; }
+.detail-panel h3 { font-size: 0.8rem; color: #38bdf8; margin-bottom: 8px; }
+.detail-panel .signal-card { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 0.7rem; }
+.detail-panel .signal-card .signal-type { color: #f59e0b; font-weight: 600; font-size: 0.65rem; text-transform: uppercase; margin-bottom: 4px; }
+.detail-panel .signal-card .signal-body { color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; }
+.detail-panel .meta { font-size: 0.7rem; color: #94a3b8; margin-bottom: 12px; line-height: 1.6; }
+.detail-panel .meta strong { color: #e2e8f0; }
+
+svg { display: block; }
+svg text { font-family: -apple-system, sans-serif; pointer-events: none; }
+.node { cursor: pointer; }
+.node:hover rect, .node:hover .lane-bg { filter: brightness(1.2); }
+.node.selected rect { stroke-width: 3 !important; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5)); }
+
+.edge-path { fill: none; stroke-width: 1.5; }
+.derivation { stroke-dasharray: 6 3; }
+
+@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulseGlow { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.4); } }
+.animating { animation: fadeSlideIn 0.4s ease forwards; }
+.pulse { animation: pulseGlow 1.2s ease infinite; }
+
+.timeline { height: 3px; background: #1e293b; }
+.timeline-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #0ea5e9, #22c55e); border-radius: 2px; transition: width 0.4s; }
+
+.step-label { font-size: 0.7rem; color: #64748b; padding: 4px 20px; border-bottom: 1px solid #1e293b; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Investigation DAG</h1>
+    <div class="controls">
+        <button id="btnPlay" class="active" onclick="togglePlay()">⏸ Pause</button>
+        <button onclick="resetAnimation()">↺ Reset</button>
+        <button onclick="skipToEnd()">⏭ End</button>
+        <button onclick="zoomIn()">+</button>
+        <button onclick="zoomOut()">−</button>
+    </div>
+    <div class="speed-control">
+        <label>Speed</label>
+        <input type="range" min="400" max="2400" value="1200" step="200" oninput="setSpeed(this.value)">
+    </div>
+    <div class="legend">
+        <span><span class="legend-dot" style="background:#ef4444"></span> Rejected</span>
+        <span><span class="legend-dot" style="background:#f59e0b"></span> Partial</span>
+        <span><span class="legend-dot" style="background:#22c55e"></span> Confirmed</span>
+        <span><span class="legend-dot" style="background:#a855f7"></span> Derivation</span>
+    </div>
+</div>
+<div class="timeline"><div class="timeline-fill" id="timelineFill"></div></div>
+<div class="step-label" id="stepLabel">Ready</div>
+
+<div class="main">
+    <div class="dag-area" id="dagArea">
+        <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="detail-panel" id="detailPanel">
+        <h3 id="detailTitle"></h3>
+        <div id="detailBody"></div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA — C07-corrupted-data 시나리오
+// ═══════════════════════════════════════════════════════
+var INVESTIGATION = {
+    symptom: {
+        id: 'symptom', title: 'Hasher 에러율 임계값 초과 알람', time: '01:20',
+        description: 'CloudWatch 알람 devops-agent-test-hasher-errors가 ALARM 상태로 전환됨. Error Sum > 5 임계값 초과.',
+        signals: [{ type: 'alarm', body: 'Alarm: devops-agent-test-hasher-errors\nState: OK → ALARM\nReason: Error Sum > 5 (actual: 39)\nTime: 2026-04-06T01:16:19Z\nNamespace: dockercoins\nService: hasher' }]
+    },
+    // 초기 가설 (symptom에서 직접 파생)
+    initial_hypotheses: ['h1', 'h2'],
+    hypotheses: {
+        h1: {
+            id: 'h1', title: 'Hasher 자체 버그?', status: 'rejected',
+            rejected_reason: 'Hasher 코드 문제 아님. 외부에서 빈 데이터가 들어오고 있음. "Empty input received from client" — client(worker)가 빈 input을 보내는 것이 원인.',
+            leads_to: { target: 'h3', reason: '빈 input을 누가 보내는가?' },
+            steps: [
+                {
+                    id: 'h1s1', action: 'Hasher 에러 메트릭 확인', data_source: 'metric',
+                    insight: '에러 68→0→26→94: 급감 후 복구 패턴. 지속적 고에러(93/분) 상태',
+                    is_key: false, time: '01:25',
+                    signals: [{ type: 'metric', body: 'CloudWatch Metric: ApplicationSignals/Error\nService: hasher | Period: 1min\n\n01:13 → 68건\n01:14 → 0건 (급감!)\n01:15 → 26건\n01:16 → 94건 (복구)\n01:17 → 83건\n\n분석: 일시적 급감은 Pod 재시작 가능성.\n전체적으로는 ~93건/분 지속적 고에러 상태.' }]
+                },
+                {
+                    id: 'h1s2', action: 'X-Ray 트레이스 분석', data_source: 'trace',
+                    insight: '91건 에러 동일 패턴: worker→hasher POST / → HTTP 400 "Empty input received from client"',
+                    is_key: true, time: '01:28',
+                    signals: [
+                        { type: 'trace', body: 'X-Ray Trace: 1-69d30866-68f47dad3b00d41ee103829a\nDuration: 105ms | Status: ERROR\n\nSpans:\n  worker (InternalOperation) 105ms ❌\n    └→ hasher (POST /) 101ms ❌\n         Error: "Validation failed: Empty input received from client"\n\n동일 패턴: 91건 / 총 351건 (26%)\n모두 worker→hasher 구간에서 400 반환' },
+                        { type: 'log', body: 'Log Group: /dockercoins/hasher\n\n[01:10:01.275] ERROR in hasher: Validation failed: Empty input received from client\n[01:10:01.891] ERROR in hasher: Validation failed: Empty input received from client\n[01:11:03.445] ERROR in hasher: Validation failed: Empty input received from client\n...\n\n총 543건 (01:10 ~ 01:20 윈도우)' }
+                    ]
+                }
+            ]
+        },
+        h2: {
+            id: 'h2', title: '배포/코드 변경?', status: 'partial',
+            rejected_reason: 'hasher sleep 0.1→2 변경 발견. 지연 증가 원인이나 HTTP 400 에러의 직접 원인은 아님.',
+            leads_to: null,
+            steps: [
+                {
+                    id: 'h2s1', action: '최근 코드 변경 확인', data_source: 'code',
+                    insight: 'hasher.rb: sleep 0.1→2 변경 (v1.0.1→v1.0.2). 지연 관련이나 400 에러와 무관',
+                    is_key: false, time: '01:30',
+                    signals: [{ type: 'code', body: 'Repository: sorididim11/frontier-devops-agent-test-app\nFile: services/dockercoins/hasher/hasher.rb\nCommit: 1d341af → da6e2e7\n\n--- a/hasher.rb\n+++ b/hasher.rb\n@@ -1 +1 @@\n-# Version: 1.0.1 - GitHub Actions CI/CD test\n+# Version: 1.0.2 - Performance degradation test (sleep 2s)\n\n@@ -53,3 +53,3 @@\n  post \'/\' do\n-    sleep 0.1\n+    sleep 2\n     content_type \'text/plain\'' }]
+                }
+            ]
+        },
+        h3: {
+            id: 'h3', title: 'Upstream RNG 오염?', status: 'confirmed',
+            derived_from: 'h1',
+            derivation_reason: '"Empty input from client" → Worker가 빈 데이터 전달 → RNG가 빈 데이터 생성?',
+            steps: [
+                {
+                    id: 'h3s1', action: 'K8s 배포 변경 이력 확인', data_source: 'k8s',
+                    insight: 'RNG deployment revision 115→116: RNG_CORRUPTION_RATE=0.5 환경변수 신규 추가!',
+                    is_key: true, time: '01:32',
+                    signals: [{ type: 'change_event', body: 'K8s Deployment Change Detected\n\nResource: deployment/rng (namespace: dockercoins)\nRevision: 115 → 116\nImage: rng:v1.0.6 (변경 없음)\n\nEnvironment Variables:\n  OLD (rev 115): RNG_CORRUPTION_RATE 없음\n  NEW (rev 116): RNG_CORRUPTION_RATE = 0.5  ← 신규 추가!\n\nReplicaSet:\n  Old: rng-66c699d89d\n  New: rng-f49bb56d4\n\nTimestamp: 2026-04-06T01:15:06Z\nActor: deployment update (unknown)' }]
+                }
+            ],
+            finding: {
+                id: 'finding-root', title: 'RNG corruption_rate=0.5 → 50% 빈 데이터 반환',
+                type: 'root_cause',
+                description: 'RNG(v1.0.6)에 RNG_CORRUPTION_RATE=0.5 환경변수가 추가되어 50% 확률로 빈/손상 데이터를 HTTP 200으로 반환.\nWorker는 RNG 응답을 무검증으로 Hasher에 전달.\nHasher는 빈 input 검증 실패 → HTTP 400 반환.\n\n인과 체인: RNG 오염 설정 → Worker 무검증 전달 → Hasher 검증 실패 → 에러율 급증'
+            }
+        }
+    },
+    summary: {
+        id: 'summary', title: 'Root Cause 확정',
+        cause: 'RNG 데이터 오염 (RNG_CORRUPTION_RATE=0.5)',
+        impact: 'Hasher HTTP 400 에러 ~93건/분 지속',
+        chain: 'RNG 빈 데이터 반환 → Worker 무검증 전달 → Hasher 검증 실패 → 에러 알람',
+        gaps: []
+    }
+};
+
+// ═══════════════════════════════════════════════════════
+//  ANIMATION SEQUENCE
+//  핵심: H3는 처음에 없고, H1 기각 후 파생됨
+// ═══════════════════════════════════════════════════════
+var ANIM_SEQUENCE = [
+    { type: 'symptom', label: '🔔 알람 수신: Hasher 에러율 초과' },
+    { type: 'show_hyp', ids: ['h1', 'h2'], label: '🧠 초기 가설 수립: H1(Hasher 버그?), H2(배포 변경?)' },
+    { type: 'step', hyp: 'h1', step: 'h1s1', label: '📊 H1: Hasher 에러 메트릭 확인 → 93/분 지속 고에러' },
+    { type: 'step', hyp: 'h1', step: 'h1s2', label: '🔗 H1: X-Ray 트레이스 → "Empty input from client" 발견 ⭐' },
+    { type: 'step', hyp: 'h2', step: 'h2s1', label: '📝 H2: 코드 변경 확인 → sleep 변경, 에러와 무관' },
+    { type: 'verdict', hyp: 'h2', label: '⚠️ H2 PARTIAL: 지연 관련이나 에러 원인 아님' },
+    { type: 'verdict', hyp: 'h1', label: '❌ H1 REJECTED: Hasher 문제 아님, 외부에서 빈 데이터 유입' },
+    { type: 'derive', from: 'h1', to: 'h3', label: '💡 파생: "빈 input을 누가 보내는가?" → H3: Upstream RNG?' },
+    { type: 'step', hyp: 'h3', step: 'h3s1', label: '🔧 H3: K8s 변경 확인 → RNG_CORRUPTION_RATE=0.5 발견! ⭐' },
+    { type: 'finding', hyp: 'h3', label: '💡 Finding: RNG corruption이 root cause' },
+    { type: 'verdict', hyp: 'h3', label: '✅ H3 CONFIRMED: RNG 50% 빈 데이터 → Hasher 검증 실패' },
+    { type: 'summary', label: '✅ Root Cause 확정: RNG 오염 → Worker 전달 → Hasher 에러' }
+];
+
+// ═══════════════════════════════════════════════════════
+//  LAYOUT ENGINE
+// ═══════════════════════════════════════════════════════
+var COL_W = 240, COL_GAP = 28, ROW_H = 68, ROW_GAP = 8;
+var HEADER_H = 36, NODE_PAD = 12;
+var LEFT = 50, TOP = 70;
+var scale = 1, animStep = -1, playing = true, speed = 1200, animTimer = null;
+var selectedNode = null;
+var visibleSet = new Set();
+
+function getHypX(index) { return LEFT + index * (COL_W + COL_GAP); }
+
+// 현재 보이는 가설들의 index를 계산
+function getVisibleHypotheses() {
+    var hyps = [];
+    if (visibleSet.has('h1')) hyps.push('h1');
+    if (visibleSet.has('h2')) hyps.push('h2');
+    if (visibleSet.has('h3')) hyps.push('h3');
+    return hyps;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SVG UTILS
+// ═══════════════════════════════════════════════════════
+function svgEl(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (attrs) for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+}
+function svgText(parent, x, y, text, opts) {
+    opts = opts || {};
+    var t = svgEl('text', { x:x, y:y, 'text-anchor': opts.anchor||'start', 'font-size': opts.size||'10', fill: opts.fill||'#e2e8f0', 'font-weight': opts.bold?'600':'400' });
+    t.textContent = text;
+    parent.appendChild(t);
+    return t;
+}
+
+var COLORS = {
+    rejected: { bg:'#2d1111', border:'#ef4444', text:'#fca5a5', headerBg:'#450a0a' },
+    partial: { bg:'#2d2211', border:'#f59e0b', text:'#fde68a', headerBg:'#422006' },
+    confirmed: { bg:'#112d18', border:'#22c55e', text:'#86efac', headerBg:'#14532d' },
+    pending: { bg:'#1a2233', border:'#475569', text:'#94a3b8', headerBg:'#1e293b' }
+};
+var ICONS = { metric:'📊', trace:'🔗', log:'📋', code:'📝', k8s:'🔧', change_event:'🔧', alarm:'🔔' };
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+function render() {
+    var svg = document.getElementById('svg');
+    svg.innerHTML = '';
+
+    var visHyps = getVisibleHypotheses();
+    var totalCols = Math.max(visHyps.length, 2);
+    var maxSteps = 0;
+    visHyps.forEach(function(hid) {
+        var h = INVESTIGATION.hypotheses[hid];
+        var steps = h.steps.length + (h.finding && visibleSet.has(h.finding.id) ? 1 : 0);
+        if (steps > maxSteps) maxSteps = steps;
+    });
+
+    var totalW = LEFT * 2 + totalCols * COL_W + (totalCols - 1) * COL_GAP;
+    var totalH = TOP + 60 + HEADER_H + (maxSteps + 1) * (ROW_H + ROW_GAP) + 100 + 60;
+    svg.setAttribute('width', totalW * scale);
+    svg.setAttribute('height', totalH * scale);
+    svg.setAttribute('viewBox', '0 0 ' + totalW + ' ' + totalH);
+
+    // Defs (markers)
+    var defs = svgEl('defs');
+    [['arr','#475569'],['arr-r','#ef4444'],['arr-g','#22c55e'],['arr-a','#f59e0b'],['arr-p','#a855f7']].forEach(function(m){
+        var mk = svgEl('marker',{id:m[0],markerWidth:'7',markerHeight:'7',refX:'6',refY:'3.5',orient:'auto'});
+        mk.appendChild(svgEl('path',{d:'M0,0 L0,7 L7,3.5 z',fill:m[1]}));
+        defs.appendChild(mk);
+    });
+    svg.appendChild(defs);
+
+    var edgesG = svgEl('g', {id:'edges'});
+    svg.appendChild(edgesG);
+    var nodesG = svgEl('g', {id:'nodes'});
+    svg.appendChild(nodesG);
+
+    // ─── Symptom ───
+    var symX = LEFT + (totalCols * COL_W + (totalCols-1) * COL_GAP) / 2;
+    var symY = TOP;
+    if (visibleSet.has('symptom')) {
+        var sg = svgEl('g', {class:'node', 'data-id':'symptom'});
+        sg.appendChild(svgEl('rect', {x:symX-140, y:symY, width:280, height:44, rx:'8', fill:'#1e1b4b', stroke:'#6366f1', 'stroke-width':'2'}));
+        svgText(sg, symX, symY+18, '🔔  ' + INVESTIGATION.symptom.title, {anchor:'middle', size:'11', bold:true, fill:'#a5b4fc'});
+        svgText(sg, symX, symY+34, INVESTIGATION.symptom.time + ' | CloudWatch Alarm → ALARM', {anchor:'middle', size:'9', fill:'#94a3b8'});
+        sg.onclick = function(){ selectNode(INVESTIGATION.symptom); };
+        nodesG.appendChild(sg);
+    }
+
+    // ─── Hypotheses (같은 행) ───
+    var hypY = symY + 44 + 40;
+    visHyps.forEach(function(hid, idx) {
+        var h = INVESTIGATION.hypotheses[hid];
+        var colX = getHypX(idx);
+        var status = visibleSet.has(hid + '_verdict') ? h.status : 'pending';
+        var col = COLORS[status];
+
+        // Lane column background
+        var laneSteps = h.steps.length + (h.finding && visibleSet.has(h.finding.id) ? 1 : 0);
+        var laneH = HEADER_H + laneSteps * (ROW_H + ROW_GAP) + NODE_PAD * 2 + 20;
+        var laneG = svgEl('g', {class:'node','data-id':hid});
+        laneG.appendChild(svgEl('rect', {x:colX, y:hypY, width:COL_W, height:laneH, rx:'10', fill:col.bg, stroke:col.border, 'stroke-width':'1.5', opacity:'0.5'}));
+        // Header bar
+        laneG.appendChild(svgEl('rect', {x:colX, y:hypY, width:COL_W, height:HEADER_H, rx:'10', fill:col.headerBg, stroke:col.border, 'stroke-width':'1.5'}));
+        // clip bottom corners of header
+        laneG.appendChild(svgEl('rect', {x:colX, y:hypY+20, width:COL_W, height:HEADER_H-20, fill:col.headerBg}));
+        var icon = status==='confirmed'?'✅': status==='rejected'?'❌': status==='partial'?'⚠️':'🔍';
+        svgText(laneG, colX+12, hypY+23, icon+' '+h.title, {size:'11', bold:true, fill:col.text});
+        if (h.derived_from) {
+            svgText(laneG, colX+COL_W-10, hypY+23, '← derived', {anchor:'end', size:'8', fill:'#a855f7'});
+        }
+        laneG.onclick = function(){ selectNode(h); };
+        nodesG.appendChild(laneG);
+
+        // Steps inside lane
+        var stepY = hypY + HEADER_H + NODE_PAD;
+        h.steps.forEach(function(s) {
+            if (!visibleSet.has(s.id)) return;
+            var sG = svgEl('g', {class:'node','data-id':s.id});
+            var sBorder = s.is_key ? '#f59e0b' : '#334155';
+            var sBg = s.is_key ? '#1c1917' : '#0f172a';
+            sG.appendChild(svgEl('rect', {x:colX+8, y:stepY, width:COL_W-16, height:ROW_H-4, rx:'6', fill:sBg, stroke:sBorder, 'stroke-width': s.is_key?'2':'1'}));
+            var srcIcon = ICONS[s.data_source]||'📄';
+            svgText(sG, colX+18, stepY+16, srcIcon+' '+s.action, {size:'10', bold:true});
+            // wrap insight
+            var ins = s.insight;
+            svgText(sG, colX+18, stepY+32, ins.slice(0,38), {size:'9', fill:'#94a3b8'});
+            if (ins.length > 38) svgText(sG, colX+18, stepY+44, ins.slice(38,74), {size:'9', fill:'#94a3b8'});
+            svgText(sG, colX+COL_W-18, stepY+16, s.time, {anchor:'end', size:'8', fill:'#64748b'});
+            if (s.is_key) svgText(sG, colX+COL_W-18, stepY+ROW_H-12, '⭐ KEY', {anchor:'end', size:'8', fill:'#f59e0b'});
+            sG.onclick = function(){ selectNode(s); };
+            nodesG.appendChild(sG);
+            stepY += ROW_H + ROW_GAP;
+        });
+
+        // Finding (inside lane, below steps)
+        if (h.finding && visibleSet.has(h.finding.id)) {
+            var fG = svgEl('g', {class:'node','data-id':h.finding.id});
+            fG.appendChild(svgEl('rect', {x:colX+8, y:stepY, width:COL_W-16, height:ROW_H-4, rx:'6', fill:'#0a2e1a', stroke:'#22c55e', 'stroke-width':'2'}));
+            svgText(fG, colX+18, stepY+16, '💡 '+h.finding.title.slice(0,32), {size:'10', bold:true, fill:'#86efac'});
+            svgText(fG, colX+18, stepY+32, '['+h.finding.type+']', {size:'9', fill:'#94a3b8'});
+            fG.onclick = function(){ selectNode(h.finding); };
+            nodesG.appendChild(fG);
+            stepY += ROW_H + ROW_GAP;
+        }
+
+        // Verdict (below lane)
+        if (visibleSet.has(hid + '_verdict')) {
+            var vY = hypY + laneH + 8;
+            var vG = svgEl('g', {'data-id':hid+'_verdict'});
+            var vText = status==='confirmed' ? '✅ CONFIRMED' : status==='rejected' ? '❌ REJECTED' : '⚠️ PARTIAL';
+            var vDetail = h.rejected_reason ? h.rejected_reason.slice(0,44) : '';
+            vG.appendChild(svgEl('rect', {x:colX+20, y:vY, width:COL_W-40, height:28, rx:'4', fill:col.headerBg, stroke:col.border, 'stroke-width':'1', opacity:'0.8'}));
+            svgText(vG, colX+COL_W/2, vY+12, vText, {anchor:'middle', size:'9', bold:true, fill:col.text});
+            svgText(vG, colX+COL_W/2, vY+23, vDetail, {anchor:'middle', size:'8', fill:'#94a3b8'});
+            nodesG.appendChild(vG);
+        }
+
+        // Edge: symptom → hypothesis
+        if (visibleSet.has('symptom') && !h.derived_from) {
+            var edgePath = svgEl('path', {
+                d: 'M '+symX+' '+(symY+44)+' C '+symX+' '+(symY+44+20)+' '+(colX+COL_W/2)+' '+(hypY-20)+' '+(colX+COL_W/2)+' '+hypY,
+                class:'edge-path', stroke:'#475569', 'marker-end':'url(#arr)'
+            });
+            edgesG.appendChild(edgePath);
+        }
+    });
+
+    // ─── Derivation edges ───
+    visHyps.forEach(function(hid, idx) {
+        var h = INVESTIGATION.hypotheses[hid];
+        if (!h.derived_from || !visibleSet.has('derive_'+h.derived_from+'_'+hid)) return;
+        var fromIdx = visHyps.indexOf(h.derived_from);
+        if (fromIdx < 0) return;
+        var fromH = INVESTIGATION.hypotheses[h.derived_from];
+        var fromX = getHypX(fromIdx);
+        var toX = getHypX(idx);
+        var fromSteps = fromH.steps.length;
+        var fromLaneH = HEADER_H + fromSteps * (ROW_H + ROW_GAP) + NODE_PAD * 2 + 20;
+        var verdictY = hypY + fromLaneH + 8 + 14;
+
+        // Draw curved derivation edge from verdict to new hypothesis header
+        var startX = fromX + COL_W - 20;
+        var startY = verdictY;
+        var endX = toX + COL_W / 2;
+        var endY = hypY;
+
+        // Route: go down from verdict, then curve up to H3
+        var midY = Math.max(startY, endY) + 40;
+        var d = 'M '+startX+' '+startY+' C '+startX+' '+midY+' '+endX+' '+midY+' '+endX+' '+endY;
+        var dEdge = svgEl('path', {d:d, class:'edge-path derivation', stroke:'#a855f7', 'stroke-width':'2', 'marker-end':'url(#arr-p)'});
+        edgesG.appendChild(dEdge);
+
+        // Label on edge
+        var lblX = (startX + endX) / 2;
+        var lblY = midY - 4;
+        var lblG = svgEl('g');
+        var reason = h.derivation_reason ? h.derivation_reason.slice(0,28) : h.leads_to_reason || '';
+        lblG.appendChild(svgEl('rect', {x:lblX-80, y:lblY-10, width:160, height:18, rx:'4', fill:'#1e1b4b', stroke:'#a855f7', 'stroke-width':'1', opacity:'0.9'}));
+        svgText(lblG, lblX, lblY+3, '💡 '+reason, {anchor:'middle', size:'8', fill:'#c4b5fd'});
+        edgesG.appendChild(lblG);
+    });
+
+    // ─── Summary ───
+    if (visibleSet.has('summary')) {
+        var sumY = totalH - 70;
+        var sumG = svgEl('g', {class:'node','data-id':'summary'});
+        sumG.appendChild(svgEl('rect', {x:symX-150, y:sumY, width:300, height:48, rx:'8', fill:'#14532d', stroke:'#22c55e', 'stroke-width':'2'}));
+        svgText(sumG, symX, sumY+18, '✅ '+INVESTIGATION.summary.title, {anchor:'middle', size:'11', bold:true, fill:'#86efac'});
+        svgText(sumG, symX, sumY+36, INVESTIGATION.summary.chain, {anchor:'middle', size:'9', fill:'#94a3b8'});
+        sumG.onclick = function(){ selectNode(INVESTIGATION.summary); };
+        nodesG.appendChild(sumG);
+
+        // Edge from confirmed hypothesis to summary
+        visHyps.forEach(function(hid, idx) {
+            var h = INVESTIGATION.hypotheses[hid];
+            if (h.status !== 'confirmed' || !visibleSet.has(hid+'_verdict')) return;
+            var colX = getHypX(idx);
+            var laneSteps = h.steps.length + (h.finding && visibleSet.has(h.finding.id) ? 1 : 0);
+            var laneH = HEADER_H + laneSteps * (ROW_H + ROW_GAP) + NODE_PAD * 2 + 20;
+            var vY = hypY + laneH + 8 + 28;
+            var eP = svgEl('path', {
+                d:'M '+(colX+COL_W/2)+' '+vY+' C '+(colX+COL_W/2)+' '+(vY+30)+' '+symX+' '+(sumY-30)+' '+symX+' '+sumY,
+                class:'edge-path', stroke:'#22c55e', 'stroke-width':'1.5', 'marker-end':'url(#arr-g)'
+            });
+            edgesG.appendChild(eP);
+        });
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//  ANIMATION
+// ═══════════════════════════════════════════════════════
+function applyStep(i) {
+    var action = ANIM_SEQUENCE[i];
+    switch (action.type) {
+        case 'symptom':
+            visibleSet.add('symptom');
+            break;
+        case 'show_hyp':
+            action.ids.forEach(function(id) { visibleSet.add(id); });
+            break;
+        case 'step':
+            visibleSet.add(action.step);
+            break;
+        case 'verdict':
+            visibleSet.add(action.hyp + '_verdict');
+            break;
+        case 'derive':
+            visibleSet.add(action.to);
+            visibleSet.add('derive_' + action.from + '_' + action.to);
+            break;
+        case 'finding':
+            var h = INVESTIGATION.hypotheses[action.hyp];
+            if (h && h.finding) visibleSet.add(h.finding.id);
+            break;
+        case 'summary':
+            visibleSet.add('summary');
+            break;
+    }
+}
+
+function revealUpTo(step) {
+    visibleSet.clear();
+    for (var i = 0; i <= step && i < ANIM_SEQUENCE.length; i++) {
+        applyStep(i);
+    }
+    render();
+    // Update label
+    if (step >= 0 && step < ANIM_SEQUENCE.length) {
+        document.getElementById('stepLabel').textContent = '[' + (step+1) + '/' + ANIM_SEQUENCE.length + '] ' + ANIM_SEQUENCE[step].label;
+    }
+    var pct = ANIM_SEQUENCE.length > 1 ? (step / (ANIM_SEQUENCE.length - 1)) * 100 : 0;
+    document.getElementById('timelineFill').style.width = pct + '%';
+}
+
+function startAnimation() {
+    if (animTimer) return;
+    playing = true;
+    document.getElementById('btnPlay').textContent = '⏸ Pause';
+    document.getElementById('btnPlay').classList.add('active');
+    tick();
+    animTimer = setInterval(tick, speed);
+}
+function tick() {
+    if (animStep < ANIM_SEQUENCE.length - 1) {
+        animStep++;
+        revealUpTo(animStep);
+    } else {
+        stopAnimation();
+    }
+}
+function stopAnimation() {
+    playing = false;
+    document.getElementById('btnPlay').textContent = '▶ Play';
+    document.getElementById('btnPlay').classList.remove('active');
+    if (animTimer) { clearInterval(animTimer); animTimer = null; }
+}
+function togglePlay() { if (playing) stopAnimation(); else startAnimation(); }
+function resetAnimation() { stopAnimation(); animStep = -1; visibleSet.clear(); render(); document.getElementById('stepLabel').textContent = 'Ready'; document.getElementById('timelineFill').style.width = '0%'; }
+function skipToEnd() { stopAnimation(); animStep = ANIM_SEQUENCE.length - 1; revealUpTo(animStep); }
+function setSpeed(val) { speed = parseInt(val); if (playing) { clearInterval(animTimer); animTimer = setInterval(tick, speed); } }
+function zoomIn() { scale = Math.min(scale * 1.15, 2.5); revealUpTo(animStep); }
+function zoomOut() { scale = Math.max(scale * 0.85, 0.5); revealUpTo(animStep); }
+
+// ═══════════════════════════════════════════════════════
+//  DETAIL PANEL
+// ═══════════════════════════════════════════════════════
+function selectNode(data) {
+    var panel = document.getElementById('detailPanel');
+    var title = document.getElementById('detailTitle');
+    var body = document.getElementById('detailBody');
+
+    if (selectedNode === data.id) { panel.classList.remove('open'); selectedNode = null; return; }
+    selectedNode = data.id;
+    panel.classList.add('open');
+    title.textContent = data.title || data.action || data.id || '';
+
+    var html = '<div class="meta">';
+    if (data.time) html += '<strong>Time:</strong> ' + data.time + '<br>';
+    if (data.data_source) html += '<strong>Data Source:</strong> ' + data.data_source + '<br>';
+    if (data.status) html += '<strong>Status:</strong> ' + data.status + '<br>';
+    if (data.type) html += '<strong>Type:</strong> ' + data.type + '<br>';
+    html += '</div>';
+
+    if (data.description) html += '<p style="font-size:0.75rem;color:#cbd5e1;margin-bottom:12px;white-space:pre-wrap;">' + escHtml(data.description) + '</p>';
+    if (data.insight) html += '<p style="font-size:0.75rem;color:#cbd5e1;margin-bottom:12px;"><strong style="color:#38bdf8;">Insight:</strong> ' + escHtml(data.insight) + '</p>';
+    if (data.rejected_reason) html += '<p style="font-size:0.75rem;color:#fca5a5;margin-bottom:12px;"><strong>기각 이유:</strong> ' + escHtml(data.rejected_reason) + '</p>';
+    if (data.derivation_reason) html += '<p style="font-size:0.75rem;color:#c4b5fd;margin-bottom:12px;"><strong>파생 이유:</strong> ' + escHtml(data.derivation_reason) + '</p>';
+    if (data.chain) html += '<p style="font-size:0.75rem;color:#86efac;margin-bottom:12px;"><strong>인과 체인:</strong> ' + escHtml(data.chain) + '</p>';
+    if (data.cause) html += '<p style="font-size:0.75rem;color:#86efac;margin-bottom:8px;"><strong>Cause:</strong> ' + escHtml(data.cause) + '</p>';
+    if (data.impact) html += '<p style="font-size:0.75rem;color:#fca5a5;margin-bottom:8px;"><strong>Impact:</strong> ' + escHtml(data.impact) + '</p>';
+
+    if (data.leads_to) html += '<p style="font-size:0.75rem;color:#c4b5fd;margin-bottom:12px;"><strong>Leads to:</strong> ' + data.leads_to.target + ' — "' + escHtml(data.leads_to.reason) + '"</p>';
+
+    var signals = data.signals || [];
+    signals.forEach(function(s) {
+        html += '<div class="signal-card"><div class="signal-type">'+(ICONS[s.type]||'📄')+' '+s.type+'</div><div class="signal-body">'+escHtml(s.body)+'</div></div>';
+    });
+    body.innerHTML = html;
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+render();
+setTimeout(startAnimation, 500);
+</script>
+</body>
+</html>

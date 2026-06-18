@@ -1,0 +1,29 @@
+# DevOps Agent Test Simulator Configuration
+# Copy to config.yaml and fill in your values.
+# Environment variables take precedence (see config.py for mapping).
+
+agent:
+  space_id: ""
+  webhook_secret_name: ""
+
+simulator:
+  url: "http://localhost:8080"
+
+aws:
+  region: "us-east-1"
+  account_id: ""
+
+kubernetes:
+  namespace: "dockercoins"
+  cluster_name: ""
+
+dynamodb:
+  events_table: ""
+  runs_table: ""
+
+bedrock:
+  default_model: "us.anthropic.claude-opus-4-6-v1"
+  models:
+    haiku: "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+    sonnet: "us.anthropic.claude-sonnet-4-20250514-v1:0"
+    opus: "us.anthropic.claude-opus-4-6-v1"

@@ -1,0 +1,32 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: {{ scenario_id }}-delay
+  namespace: {{ namespace }}
+  labels:
+    simulator.chaos/scenario: "{{ scenario_id }}"
+    simulator.chaos/category: "network"
+    simulator.chaos/template: "NET-001"
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - "{{ namespace }}"
+    labelSelectors:
+      {{ label_selector_yaml | indent(6) }}
+  delay:
+    latency: "{{ latency | default('500ms') }}"
+    jitter: "{{ jitter | default('100ms') }}"
+    correlation: "{{ correlation | default('25') }}"
+  direction: {{ direction | default('to') }}
+{% if target_label_selector_yaml is defined %}
+  target:
+    selector:
+      namespaces:
+        - "{{ namespace }}"
+      labelSelectors:
+        {{ target_label_selector_yaml | indent(8) }}
+    mode: all
+{% endif %}
+  duration: "{{ duration | default('5m') }}"

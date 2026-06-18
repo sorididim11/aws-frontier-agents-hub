@@ -1,0 +1,70 @@
+{
+  "id": "SEC-f-5e2c10",
+  "name": "Arbitrary File Write via Path Traversal in scenario_id Parameter of /api/scenario-improvements/accept",
+  "description": "The POST /api/scenario-improvements/accept endpoint accepts a `scenario_id` field in the JSON request body that is used directly in filesystem path construction without any sanitization or validation. The server constructs a path by joining the application directory, \"scenarios\", and the user-supplied `scenario_id`, then creates directories and writes attacker-controlled content (from the `script_fix` parameter) to a file at that location.\n\nBy including path traversal sequences (e.g., `../static/`), an unauthenticated attacker can escape the intended `scenarios/` directory and write arbitrary content to any writable location on the server. When targeting the Flask static directory, the written files become immediately web-accessible, enabling creation of web shells or serving of malicious content.\n\nThe endpoint requires no authentication, making this exploitable by any remote attacker. The `script_fix` content is written as-is with no restrictions on content type or size. Combined with the application running as root (uid=0), this vulnerability enables full server compromise through arbitrary file write capabilities.",
+  "category": "security-DockerCoins",
+  "app_name": "DockerCoins",
+  "layer": "app",
+  "target_service": "DockerCoins",
+  "failure_mode": "PATH_TRAVERSAL",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "PATH_TRAVERSAL 취약점 — Arbitrary File Write via Path Traversal in scenario_id Parameter of /api/scenario-improvements/accept",
+  "source": "security-agent",
+  "finding_id": "f-5e2c105a-6951-4299-bac1-b1c13384b967",
+  "risk_level": "CRITICAL",
+  "risk_type": "PATH_TRAVERSAL",
+  "endpoint": "",
+  "attack_steps": [
+    {
+      "method": "POST",
+      "path": "/api/scenario-improvements/accept",
+      "headers": {},
+      "body": "{\"scenario_id\": \"FM-01-network-isolation\", \"script_fix\": \"#!/bin/bash\\necho 'baseline test'\", \"space_id\": \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"}",
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-improvements/accept",
+      "headers": {},
+      "body": "{\"scenario_id\": \"../static/pt-validate-gjff8ca0\", \"script_fix\": \"PATH_TRAVERSAL_VALIDATION_gjff8ca0\", \"space_id\": \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"}",
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "GET",
+      "path": "/static/pt-validate-gjff8ca0/run.sh",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "target",
+      "label": "/api/scenario-improvements/accept"
+    }
+  ],
+  "registered_at": "2026-05-13T12:03:20.492033+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: PATH_TRAVERSAL on \n# Endpoint: /api/scenario-improvements/accept"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "PATH_TRAVERSAL 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  },
+  "devops_space_id": "4c035899-a296-49b2-b524-ba81d1256f43"
+}

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Chain Attack Detail</title>
+<link rel="icon" type="image/svg+xml" href="/static/icons/aws/aws-cloud.svg">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+
+.header{padding:10px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #1e293b}
+.header h1{font-size:.9rem;color:#ef4444;font-weight:600}
+.header .bc{font-size:.68rem;color:#64748b}
+.header .bc a{color:#94a3b8;text-decoration:none}
+.header .bc a:hover{color:#38bdf8;text-decoration:underline}
+
+.chain-meta{padding:16px 24px;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.chain-title{font-size:.78rem;color:#e2e8f0;font-weight:700;flex:1}
+.sev-badge{padding:3px 10px;border-radius:10px;font-size:.58rem;font-weight:700;text-transform:uppercase}
+.sev-badge.critical{background:#ef444420;color:#fca5a5;border:1px solid #ef444450}
+.sev-badge.high{background:#f9731620;color:#fb923c;border:1px solid #f9731650}
+
+.escalation-badge{padding:4px 12px;border-radius:6px;font-size:.56rem;font-weight:600;background:#fbbf2420;color:#fbbf24;border:1px solid #fbbf2440}
+
+.step-flow{padding:24px;overflow-x:auto}
+.step-flow svg{min-height:100px}
+
+.step-detail{padding:0 24px 24px}
+.step-card{background:#1e293b;border:1px solid #334155;border-radius:10px;margin-bottom:12px;overflow:hidden}
+.step-card-header{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #334155}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff}
+.step-action{font-size:.62rem;color:#fbbf24;font-weight:600;flex:1}
+.step-method{font-size:.52rem;color:#94a3b8;font-family:'SF Mono',monospace;background:#0f172a;padding:2px 6px;border-radius:3px}
+.step-card-body{padding:10px 14px;font-size:.56rem;color:#94a3b8;font-family:'SF Mono',monospace;white-space:pre-wrap;line-height:1.5;max-height:180px;overflow-y:auto}
+
+.comp-finding{margin-top:8px;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;display:flex;align-items:center;gap:8px}
+.comp-finding .label{font-size:.5rem;color:#64748b}
+.comp-finding .name{font-size:.54rem;color:#cbd5e1}
+
+.loading{display:inline-block;width:14px;height:14px;border:2px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <img src="/static/icons/aws/aws-cloud.svg" alt="AWS" style="width:24px;height:24px;border-radius:50%">
+    <h1>Chain Attack Detail</h1>
+    <span class="bc"><a href="/">Agent Space</a> / <a href="/security/insights">Security Insights</a> / Chain Detail</span>
+</div>
+
+<div id="chainContent">
+    <div style="text-align:center;padding:60px"><span class="loading"></span> 체인 공격 상세 로딩...</div>
+</div>
+
+<script>
+(function() {
+    var chainId = "{{ chain_id }}";
+    var _params = new URLSearchParams(location.search);
+    var secSpaceId = _params.get('sec_space_id') || '';
+    var devopsSpaceId = _params.get('space_id') || '';
+
+    function apiUrl(path) {
+        if (secSpaceId) return path + (path.indexOf('?')>=0?'&':'?') + 'sec_space_id=' + encodeURIComponent(secSpaceId);
+        return path;
+    }
+
+    fetch(apiUrl('/api/security/insights/chain/' + encodeURIComponent(chainId)))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                document.getElementById('chainContent').innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444">Error: ' + esc(data.error||'') + '</div>';
+                return;
+            }
+            render(data.chain);
+        })
+        .catch(function(e) {
+            document.getElementById('chainContent').innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444">' + esc(String(e)) + '</div>';
+        });
+
+    function render(chain) {
+        var el = document.getElementById('chainContent');
+        var html = '';
+
+        // Meta
+        var sevClass = (chain.riskLevel||'').toLowerCase();
+        html += '<div class="chain-meta">';
+        html += '<span class="sev-badge ' + sevClass + '">' + esc(chain.riskLevel) + '</span>';
+        html += '<span class="chain-title">' + esc(chain.name) + '</span>';
+        if (chain.escalation && chain.escalation.escalated) {
+            html += '<span class="escalation-badge">ESCALATION ' + chain.escalation.max_individual + ' → ' + chain.escalation.chain_combined + '</span>';
+        }
+        if (chain.riskScore) html += '<span style="font-size:.56rem;color:#94a3b8">CVSS ' + chain.riskScore + '</span>';
+        html += '</div>';
+
+        // Step flow SVG (horizontal)
+        var steps = chain.steps || [];
+        if (steps.length >= 2) {
+            var stepW = 180, stepH = 54, gap = 36;
+            var fW = steps.length * (stepW + gap) - gap + 40;
+            var fH = stepH + 30;
+            var riskColors = {CRITICAL:'#ef4444',HIGH:'#f97316',MEDIUM:'#f59e0b',LOW:'#22c55e'};
+            var cc = riskColors[chain.riskLevel] || '#ef4444';
+
+            html += '<div class="step-flow">';
+            html += '<svg width="' + fW + '" height="' + fH + '" viewBox="0 0 ' + fW + ' ' + fH + '" style="font-family:\'SF Mono\',monospace">';
+            html += '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="' + cc + '"/></marker></defs>';
+
+            for (var i = 0; i < steps.length; i++) {
+                var s = steps[i];
+                var sx = 20 + i * (stepW + gap);
+                var sy = 10;
+
+                // Box
+                html += '<rect x="' + sx + '" y="' + sy + '" width="' + stepW + '" height="' + stepH + '" rx="6" fill="#1e293b" stroke="' + cc + '80" stroke-width="1.5"/>';
+                // Step number
+                html += '<circle cx="' + (sx+16) + '" cy="' + (sy+16) + '" r="9" fill="' + cc + '"/>';
+                html += '<text x="' + (sx+16) + '" y="' + (sy+16) + '" fill="#fff" font-size="9" text-anchor="middle" dominant-baseline="middle" font-weight="700">' + s.step + '</text>';
+                // Method
+                html += '<text x="' + (sx+30) + '" y="' + (sy+17) + '" fill="#94a3b8" font-size="8">' + esc(s.method) + '</text>';
+                // Path
+                html += '<text x="' + (sx+10) + '" y="' + (sy+33) + '" fill="#e2e8f0" font-size="8">' + esc((s.path||'').substring(0,24)) + '</text>';
+                // Action
+                var action = s.action || '';
+                html += '<text x="' + (sx+10) + '" y="' + (sy+47) + '" fill="#fbbf24" font-size="7.5" font-style="italic">' + esc(action.substring(0,28)) + '</text>';
+
+                // Arrow
+                if (i < steps.length - 1) {
+                    var ax1 = sx + stepW + 3, ax2 = sx + stepW + gap - 3, ay = sy + stepH/2;
+                    html += '<line x1="' + ax1 + '" y1="' + ay + '" x2="' + ax2 + '" y2="' + ay + '" stroke="' + cc + '" stroke-width="2" marker-end="url(#arrow)"/>';
+                }
+            }
+            html += '</svg></div>';
+        }
+
+        // Step detail cards
+        html += '<div class="step-detail">';
+        var scriptParts = (chain.attackScript || '').split(/(?=Step\s+\d)/);
+        for (var i = 0; i < steps.length; i++) {
+            var s = steps[i];
+            var cc2 = riskColors[chain.riskLevel] || '#ef4444';
+
+            html += '<div class="step-card">';
+            html += '<div class="step-card-header">';
+            html += '<span class="step-num" style="background:' + cc2 + '">' + s.step + '</span>';
+            html += '<span class="step-action">' + esc(s.action || 'Step ' + s.step) + '</span>';
+            html += '<span class="step-method">' + esc(s.method + ' ' + (s.path||'')) + '</span>';
+            html += '</div>';
+
+            // Raw script content for this step
+            var stepScript = '';
+            for (var pi = 0; pi < scriptParts.length; pi++) {
+                if (scriptParts[pi].match(new RegExp('^Step\\s+' + s.step + '\\b'))) {
+                    stepScript = scriptParts[pi].trim();
+                    break;
+                }
+            }
+            if (stepScript) {
+                html += '<div class="step-card-body">' + esc(stepScript) + '</div>';
+            }
+
+            // Component finding
+            if (s.component_finding) {
+                var cf = s.component_finding;
+                html += '<div class="comp-finding">';
+                html += '<span class="label">관련 취약점:</span>';
+                html += '<span class="sev-badge ' + (cf.riskLevel||'').toLowerCase() + '" style="font-size:.46rem;padding:1px 5px">' + esc(cf.riskLevel) + '</span>';
+                html += '<span class="name">' + esc(cf.name) + '</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+
+        // Description
+        if (chain.description) {
+            html += '<div style="padding:0 24px 24px">';
+            html += '<div style="font-size:.56rem;color:#64748b;font-weight:600;margin-bottom:6px">DESCRIPTION</div>';
+            html += '<div style="font-size:.56rem;color:#94a3b8;line-height:1.6;background:#1e293b;padding:12px;border-radius:8px;border:1px solid #334155">' + esc(chain.description) + '</div>';
+            html += '</div>';
+        }
+
+        // Actions
+        var btnStyle = 'padding:6px 14px;border:none;border-radius:6px;font-size:.56rem;font-weight:600;cursor:pointer;transition:opacity .2s;';
+        html += '<div style="padding:0 24px 24px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+        html += '<button id="btnRegister" style="' + btnStyle + 'background:#1e40af;color:#93c5fd" onclick="chainAction(\'register\')">시나리오 등록</button>';
+        html += '<button id="btnPR" style="' + btnStyle + 'background:#065f46;color:#6ee7b7" onclick="chainAction(\'pr\')">코드 수정 PR 생성</button>';
+        html += '</div>';
+        html += '<div id="actionResult" style="padding:0 24px 24px"></div>';
+
+        el.innerHTML = html;
+    }
+
+    window.chainAction = function(action) {
+        var resultEl = document.getElementById('actionResult');
+        if (!resultEl) return;
+
+        if (action === 'register') {
+            resultEl.innerHTML = '<div style="font-size:.52rem;color:#7dd3fc"><span class="loading"></span> 등록 중...</div>';
+            fetch(apiUrl('/api/security/insights/register-scenario'), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({finding_id: chainId, space_id: devopsSpaceId, sec_space_id: secSpaceId})})
+                .then(function(r){return r.json()})
+                .then(function(data){
+                    if (data.ok) {
+                        var scId = (data.scenario && data.scenario.id) || '';
+                        var spId = data.space_id || devopsSpaceId || '';
+                        var scenLink = '/?space_id=' + encodeURIComponent(spId) + '&tab=scenario&scenario=' + encodeURIComponent(scId);
+                        resultEl.innerHTML = '<div style="font-size:.52rem;color:#4ade80;display:flex;align-items:center;gap:8px">'
+                            + (data.already_registered ? '이미 등록됨' : '시나리오 등록 완료')
+                            + ' <a href="' + scenLink + '" target="_top" style="color:#38bdf8;font-weight:600;text-decoration:none;border:1px solid #38bdf840;padding:2px 8px;border-radius:4px">시나리오 보기 →</a></div>';
+                    } else { resultEl.innerHTML = '<div style="font-size:.52rem;color:#fca5a5">' + esc(data.error||'실패') + '</div>'; }
+                })
+                .catch(function(e){ resultEl.innerHTML = '<div style="font-size:.52rem;color:#fca5a5">' + esc(String(e)) + '</div>'; });
+
+        } else if (action === 'pr') {
+            resultEl.innerHTML = '<div style="font-size:.52rem;color:#7dd3fc"><span class="loading"></span> 코드 수정 PR 생성 중...</div>';
+            fetch(apiUrl('/api/settings/security/findings/' + encodeURIComponent(chainId) + '/remediate'), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({})})
+                .then(function(r){return r.json()})
+                .then(function(data){
+                    if (data.ok) { resultEl.innerHTML = '<div style="font-size:.52rem;color:#4ade80">PR 생성이 시작되었습니다. 완료 시 GitHub PR 링크가 표시됩니다.</div>'; }
+                    else { resultEl.innerHTML = '<div style="font-size:.52rem;color:#fca5a5">' + esc(data.error||'실패') + '</div>'; }
+                })
+                .catch(function(e){ resultEl.innerHTML = '<div style="font-size:.52rem;color:#fca5a5">' + esc(String(e)) + '</div>'; });
+        }
+    };
+
+    function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+})();
+</script>
+</body>
+</html>

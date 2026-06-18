@@ -1,0 +1,58 @@
+{
+  "id": "K01-imagepull",
+  "name": "ImagePullBackOff",
+  "category": "kubernetes",
+  "layer": "Kubernetes → Image",
+  "purpose": "존재하지 않는 이미지로 인한 ImagePullBackOff 감지",
+  "flow": [
+    "존재하지 않는 이미지 태그로 Deployment 생성",
+    "ECR에서 이미지 Pull 실패",
+    "Pod 상태 ImagePullBackOff 전환"
+  ],
+  "expected_root_cause": "Image Pull Failure - 이미지 태그 확인 필요",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl apply -f - <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: test-imagepull-fail\n  namespace: dockercoins\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: test-imagepull-fail\n  template:\n    metadata:\n      labels:\n        app: test-imagepull-fail\n    spec:\n      containers:\n      - name: hasher\n        image: ${ECR_REGISTRY}/${PROJECT_NAME}/hasher:nonexistent-v999\nEOF"
+  },
+  "restore": {
+    "command": "kubectl delete deployment test-imagepull-fail -n dockercoins --ignore-not-found"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "ImagePullBackOff 확인",
+        "type": "pod_status",
+        "pod": "test-imagepull-fail",
+        "expected": "ImagePullBackOff",
+        "timeout": 60,
+        "poll_interval": 5
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 이미지 풀 실패임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "CloudWatch"
+      ],
+      "criteria": "K8s 이벤트, pod 상태, ECR 접근 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "이미지 풀 실패 → pod 시작 불가 → 서비스 중단 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "이미지 설정 및 ECR 권한을 분석했는가"
+    }
+  }
+}

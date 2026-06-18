@@ -1,0 +1,58 @@
+{
+  "id": "K02-crashloop",
+  "name": "CrashLoopBackOff",
+  "category": "kubernetes",
+  "layer": "Kubernetes → Container",
+  "purpose": "컨테이너 즉시 종료로 인한 CrashLoopBackOff 감지",
+  "flow": [
+    "즉시 종료되는 busybox Deployment 생성",
+    "컨테이너 반복 재시작",
+    "Pod 상태 CrashLoopBackOff 전환"
+  ],
+  "expected_root_cause": "Container Crash - 컨테이너 로그 및 종료 코드 확인",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl apply -f - <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: test-crashloop\n  namespace: dockercoins\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: test-crashloop\n  template:\n    metadata:\n      labels:\n        app: test-crashloop\n    spec:\n      containers:\n      - name: crasher\n        image: busybox\n        command: [\"sh\", \"-c\", \"echo 'ERROR: Missing required configuration' && exit 1\"]\nEOF"
+  },
+  "restore": {
+    "command": "kubectl delete deployment test-crashloop -n dockercoins --ignore-not-found"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "CrashLoopBackOff 확인",
+        "type": "pod_status",
+        "pod": "test-crashloop",
+        "expected": "CrashLoopBackOff",
+        "timeout": 120,
+        "poll_interval": 10
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 CrashLoopBackOff임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "Logs"
+      ],
+      "criteria": "K8s pod 상태, 크래시 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "크래시 원인 → 반복 재시작 → 서비스 불안정 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "크래시 유발 코드/설정을 분석했는가"
+    }
+  }
+}

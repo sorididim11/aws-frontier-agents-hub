@@ -1,0 +1,59 @@
+{
+  "id": "A05-crash",
+  "name": "Process Crash",
+  "category": "single-service",
+  "layer": "Application → Bug",
+  "purpose": "프로세스 크래시 감지",
+  "flow": [
+    "hasher /crash 엔드포인트 호출",
+    "프로세스 강제 종료 (exit 1)",
+    "Pod 재시작"
+  ],
+  "expected_root_cause": "Application Error - 크래시 원인 분석",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl exec -n dockercoins deployment/worker -- wget -q -O- http://hasher/crash --timeout=10 || echo 'Crash triggered'"
+  },
+  "restore": {
+    "command": ""
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "Pod 재시작",
+        "type": "pod_logs",
+        "pod": "hasher",
+        "pattern": "FATAL|Unrecoverable",
+        "timeout": 30,
+        "poll_interval": 5
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 서비스 크래시임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "CloudWatch",
+        "Logs"
+      ],
+      "criteria": "K8s pod 재시작, CloudWatch 알람, 크래시 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "크래시 원인 → pod 재시작 → 서비스 중단 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "크래시 유발 코드를 분석했는가"
+    }
+  }
+}

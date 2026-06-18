@@ -1,0 +1,124 @@
+{
+  "id": "A03-error",
+  "name": "HTTP 500 Errors",
+  "category": "single-service",
+  "layer": "Application → Bug",
+  "purpose": "서버 에러 감지 및 로그 분석. hasher /error 엔드포인트로 HTTP 500 에러 발생.",
+  "normal_flow": [
+    {
+      "step": "Worker → Hasher",
+      "desc": "Worker가 랜덤 데이터를 Hasher에 전달 (POST /)"
+    },
+    {
+      "step": "Hasher 해시 계산",
+      "desc": "SHA256 해시 계산 후 결과 반환 (HTTP 200)"
+    },
+    {
+      "step": "Worker → Redis",
+      "desc": "해시 결과 저장"
+    }
+  ],
+  "fault_flow": [
+    {
+      "step": "🔴 에러 주입",
+      "desc": "/error 엔드포인트 반복 호출 → HTTP 500 에러 발생"
+    },
+    {
+      "step": "에러 메트릭 증가",
+      "desc": "CloudWatch Error/Fault 메트릭 증가"
+    },
+    {
+      "step": "CloudWatch 알람",
+      "desc": "hasher-errors 알람 트리거"
+    },
+    {
+      "step": "앱 → DevOps Agent",
+      "desc": "webhook으로 조사 시작 요청"
+    }
+  ],
+  "investigation_goal": "DevOps Agent가 Hasher 서비스의 HTTP 500 에러를 감지하고, 에러 로그를 분석해야 함.",
+  "expected_root_cause": "Application Error - hasher /error 엔드포인트에서 ValueError 발생",
+  "trigger": {
+    "type": "kubectl",
+    "command": "for i in $(seq 1 10); do kubectl exec -n dockercoins deployment/worker -- wget -q -O- http://hasher/error --timeout=5 2>/dev/null & done; wait; echo 'Error generation done'"
+  },
+  "pre_cleanup": {
+    "command": "kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/cache?mode=normal')\" && kubectl exec -n dockercoins deployment/rng -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/response?quality=normal')\"",
+    "reset_alarms": [
+      "${PROJECT_NAME}-hasher-faults"
+    ],
+    "wait_ok_timeout": 60
+  },
+  "restore": {
+    "command": ""
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "에러 발생 확인",
+        "type": "pod_logs",
+        "pod": "hasher",
+        "pattern": "500|ValueError|validation failed",
+        "timeout": 30,
+        "poll_interval": 5
+      },
+      {
+        "name": "X-Ray Fault Trace",
+        "type": "xray_trace",
+        "filter": "service(\"hasher\") AND fault = true",
+        "minutes": 5,
+        "timeout": 120,
+        "poll_interval": 15
+      },
+      {
+        "name": "CW 알람 확인",
+        "type": "cw_alarm",
+        "alarm": "${PROJECT_NAME}-hasher-faults",
+        "expected": "ALARM",
+        "timeout": 300,
+        "poll_interval": 15
+      },
+      {
+        "name": "DevOps Agent 조사 시작",
+        "type": "investigation_event",
+        "expected_status": "IN_PROGRESS",
+        "timeout": 600,
+        "poll_interval": 15
+      },
+      {
+        "name": "DevOps Agent 조사 완료",
+        "type": "investigation_event",
+        "expected_status": "COMPLETED",
+        "timeout": 1200,
+        "poll_interval": 30
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 hasher 서비스의 에러 반환임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "X-Ray",
+        "CloudWatch",
+        "Logs"
+      ],
+      "criteria": "X-Ray 에러 트레이스, CloudWatch 에러 메트릭, 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "에러 주입 → hasher 400 응답 → worker 실패 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "hasher.py 에러 처리 코드를 분석했는가"
+    }
+  }
+}

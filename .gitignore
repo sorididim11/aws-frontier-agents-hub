@@ -1,0 +1,106 @@
+# Credentials and Secrets
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+**/secrets.yaml
+**/secrets.yml
+
+# AWS
+.aws/
+aws-credentials
+*.aws-credentials
+
+# Kubernetes secrets
+**/secret*.yaml
+!**/secret-example.yaml
+kubeconfig
+.kube/
+
+# IDE and Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+node_modules/
+__pycache__/
+.venv/
+simulator/.venv/
+simulator/scenarios/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Docker
+.docker/
+
+# Logs
+*.log
+logs/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Local development
+.local/
+tmp/
+temp/
+
+# Per-environment config (account IDs, profile names)
+config/*.env
+!config/*.env.example
+
+# Generated K8s overlays (account-specific ECR URLs, RDS endpoints)
+infrastructure/kubernetes/overlays/*/dockercoins/kustomization.yaml
+infrastructure/kubernetes/overlays/*/dashboard/kustomization.yaml
+
+# Auto-generated architecture inventory
+.claude/skills/architecture/infrastructure_inventory.json
+docs/architecture/knowledge.json
+
+# Dashboard config with account-specific values
+services/dashboard/config.yaml
+!services/dashboard/config.yaml.example
+
+# Scenario execution results (runtime output)
+services/dashboard/results/
+
+# Desktop build artifacts
+services/dashboard/desktop/dist/
+services/dashboard/desktop/.venv-build/
+
+# Skill cache (runtime API cache)
+.skill-cache/
+
+# Security targets state (runtime)
+services/dashboard/.security-targets-state.json
+
+# Pentest validation artifacts (runtime)
+services/dashboard/static/pt-validate-*/
+
+# Setup completion marker (runtime)
+services/dashboard/.setup_done
+
+# Test results (may contain real resource info from agent responses)
+tests/results/
+tests/fixtures/
+

@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chaos Simulator</title>
+<style>
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --surface2: #242736; --border: #2d3144;
+  --text: #e2e4ea; --text2: #8b8fa3; --accent: #6366f1; --accent-light: #818cf8;
+  --red: #ef4444; --yellow: #f59e0b; --green: #22c55e; --blue: #3b82f6;
+  --orange: #f97316; --cyan: #06b6d4;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text)}
+.app{display:flex;height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-header{padding:20px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{font-size:18px;font-weight:700;letter-spacing:-.5px}
+.sidebar-header p{font-size:12px;color:var(--text2);margin-top:4px}
+.sidebar-actions{padding:12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.sidebar-actions input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px;width:100%}
+
+/* Pipeline indicator */
+.pipeline{padding:12px 16px;border-bottom:1px solid var(--border)}
+.pipe-stage{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:6px;opacity:.4;transition:all .2s;cursor:default}
+.pipe-stage.active{opacity:1;color:var(--accent-light)}
+.pipe-stage.done{opacity:1;cursor:pointer}
+.pipe-stage.done:hover{background:var(--surface2)}
+.pipe-num{width:24px;height:24px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.pipe-stage.active .pipe-num{background:var(--accent);color:#fff}
+.pipe-stage.done .pipe-num{background:var(--green);color:#fff}
+.pipe-label{font-size:13px;font-weight:500;flex:1}
+.pipe-status{font-size:12px;margin-left:auto}
+
+/* Sidebar context */
+.sidebar-ctx{flex:1;overflow-y:auto}
+.ctx-empty{display:flex;align-items:center;justify-content:center;min-height:120px;color:var(--text2);font-size:13px;text-align:center;padding:16px}
+.ctx-item{padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;font-size:13px}
+.ctx-item:hover{background:var(--surface2)}
+.ctx-item.active{background:var(--surface2);border-left:3px solid var(--accent)}
+.ctx-item .name{font-weight:500;margin-bottom:2px}
+.ctx-item .meta{font-size:11px;color:var(--text2);display:flex;gap:8px}
+.ctx-group-hdr{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);background:var(--surface2);display:flex;align-items:center;gap:8px}
+.ctx-group-hdr .cnt{background:var(--border);padding:1px 6px;border-radius:10px;font-size:10px}
+
+/* Phase progress in sidebar */
+.phase-item{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;border-bottom:1px solid var(--border)}
+.phase-icon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.phase-icon.done{background:rgba(34,197,94,.15);color:var(--green)}
+.phase-icon.active{background:rgba(99,102,241,.15);color:var(--accent)}
+.phase-icon.pending{background:var(--surface2);color:var(--text2)}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.main-header{padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;min-height:48px}
+.main-header h2{font-size:16px;font-weight:600}
+.main-content{flex:1;overflow-y:auto;padding:24px}
+
+/* Buttons */
+.btn{padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-light)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border)}
+.btn-recommend{background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff}
+.btn-recommend:hover{filter:brightness(1.1)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Stage sections ── */
+.stage-section{margin-bottom:32px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.sec-hdr h3{font-size:16px;font-weight:600}
+.sec-actions{display:flex;gap:8px}
+
+/* ── Chat panel ── */
+.chat-panel{display:flex;flex-direction:column;gap:12px}
+.chat-panel.collapsed{max-height:60px;overflow:hidden;position:relative;cursor:pointer}
+.chat-panel.collapsed::after{content:'';position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,var(--bg));pointer-events:none}
+.chat-turn{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.chat-question{padding:14px 18px;background:rgba(99,102,241,.08);border-bottom:1px solid var(--border)}
+.chat-question .phase-badge{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:4px;background:var(--accent);color:#fff;margin-bottom:8px}
+.chat-question .q-text{font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:100px;overflow-y:auto}
+.chat-answer{padding:14px 18px}
+.chat-answer .a-text{font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:180px;overflow-y:auto}
+.chat-tools{padding:6px 18px 12px;display:flex;flex-wrap:wrap;gap:6px}
+.tool-badge{font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.2)}
+.chat-result{padding:8px 18px 12px;border-top:1px solid var(--border)}
+.result-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px}
+.result-badge.ok{background:rgba(34,197,94,.12);color:var(--green)}
+.result-badge.warn{background:rgba(245,158,11,.12);color:var(--yellow)}
+.chat-waiting{padding:40px;text-align:center;color:var(--text2)}
+.chat-waiting .spinner-lg{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+.chat-phase-label{font-size:13px;font-weight:500}
+
+/* ── Topology ── */
+.topology-canvas{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:32px;min-height:400px;position:relative}
+.topo-node{display:inline-flex;flex-direction:column;align-items:center;padding:16px 20px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;position:absolute;cursor:default;transition:border-color .2s;min-width:100px}
+.topo-node:hover{border-color:var(--accent)}
+.topo-node .icon{font-size:28px;margin-bottom:8px}
+.topo-node .label{font-size:13px;font-weight:600}
+.topo-node .type{font-size:10px;color:var(--text2);margin-top:2px}
+.topo-empty{display:flex;align-items:center;justify-content:center;min-height:300px;color:var(--text2);flex-direction:column;gap:12px}
+.topo-empty .hint{font-size:13px}
+.topo-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.topo-svg line{stroke:var(--border);stroke-width:2}
+.topo-svg text{fill:var(--text2);font-size:10px}
+
+/* ── Recommend ── */
+.rec-analysis{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px}
+.rec-analysis h4{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--cyan)}
+.rec-field{margin-bottom:10px}
+.rec-field .lbl{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text2);letter-spacing:.5px;margin-bottom:3px}
+.rec-field .val{font-size:13px;line-height:1.5}
+.spof-list{display:flex;flex-wrap:wrap;gap:6px}
+.spof-tag{font-size:11px;padding:3px 10px;border-radius:4px;background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.risk-item{font-size:12px;color:var(--text2);padding:4px 0;line-height:1.4}
+.rec-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:12px;transition:border-color .2s}
+.rec-card:hover{border-color:var(--accent)}
+.rec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.rec-num{width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.rec-title{font-size:14px;font-weight:600;flex:1}
+.priority-badge{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.priority-badge.high{background:rgba(239,68,68,.15);color:var(--red)}
+.priority-badge.medium{background:rgba(245,158,11,.15);color:var(--yellow)}
+.priority-badge.low{background:rgba(34,197,94,.15);color:var(--green)}
+.rec-body{font-size:12px;color:var(--text2);line-height:1.5}
+.rec-body strong{color:var(--text);font-weight:600}
+.rec-target{font-size:12px;padding:6px 10px;background:var(--surface2);border-radius:6px;margin-top:8px;display:inline-block;color:var(--accent-light)}
+
+/* ── Scenario detail ── */
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.summary-field{margin-bottom:14px}
+.summary-field:last-child{margin-bottom:0}
+.summary-field .label{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text2);letter-spacing:.5px;margin-bottom:4px}
+.summary-field .value{font-size:13px;line-height:1.5}
+.criteria-list{list-style:none}
+.criteria-list li{font-size:13px;padding:4px 0;display:flex;align-items:flex-start;gap:8px}
+.criteria-list li::before{content:"\2713";color:var(--green);font-weight:700;flex-shrink:0}
+
+.flow-container{display:flex;flex-direction:column;gap:2px}
+.flow-step{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.flow-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.flow-icon.normal{background:rgba(59,130,246,.15);color:var(--blue)}
+.flow-icon.red{background:rgba(239,68,68,.15);color:var(--red)}
+.flow-icon.yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+.flow-icon.green{background:rgba(34,197,94,.15);color:var(--green)}
+.flow-body{flex:1}
+.flow-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.flow-desc{font-size:12px;color:var(--text2)}
+.flow-target{font-size:11px;color:var(--accent-light);margin-top:2px}
+.flow-connector{width:2px;height:12px;background:var(--border);margin-left:27px}
+
+.verify-step{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
+.verify-step .num{width:24px;height:24px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text2);flex-shrink:0}
+.verify-step .verify-body{flex:1}
+.verify-step .verify-name{font-size:13px;font-weight:500}
+.verify-step .verify-meta{font-size:11px;color:var(--text2);margin-top:2px}
+
+.yaml-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto}
+.yaml-block pre{font-family:'JetBrains Mono','Fira Code',monospace;font-size:12px;line-height:1.6;white-space:pre}
+
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+.detail-tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.detail-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;border:1px solid transparent}
+.detail-tab:hover{color:var(--text);background:var(--surface2)}
+.detail-tab.active{color:var(--accent-light);background:rgba(99,102,241,.1);border-color:var(--accent)}
+
+.editor-field{margin-bottom:16px}
+.editor-field label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px}
+.editor-field input,.editor-field textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px;font-family:inherit}
+.editor-field textarea{min-height:80px;resize:vertical}
+
+.layer-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.layer-dot.aws{background:var(--orange)}.layer-dot.kubernetes{background:var(--blue)}.layer-dot.network{background:var(--yellow)}.layer-dot.application{background:var(--green)}.layer-dot.composite{background:var(--red)}
+
+.status-bar{padding:8px 16px;border-top:1px solid var(--border);background:var(--surface);font-size:11px;color:var(--text2);display:flex;justify-content:space-between}
+.toast{position:fixed;bottom:60px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 20px;font-size:13px;z-index:100;transition:all .3s;opacity:0;transform:translateY(10px);pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.toast.error{border-color:var(--red)}.toast.success{border-color:var(--green)}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ═══ Sidebar ═══ -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Chaos Simulator</h1>
+      <p>K8s Fault Injection Engine</p>
+    </div>
+    <div class="sidebar-actions">
+      <input type="text" id="nsInput" placeholder="Namespace" value="dockercoins">
+      <button class="btn btn-primary" id="btnStart" onclick="discover()" style="width:100%">Discover Topology</button>
+    </div>
+    <div class="pipeline" id="pipeline">
+      <div class="pipe-stage" data-stage="discover"><span class="pipe-num">1</span><span class="pipe-label">Discovery</span><span class="pipe-status"></span></div>
+      <div class="pipe-stage" data-stage="topology"><span class="pipe-num">2</span><span class="pipe-label">Topology</span><span class="pipe-status"></span></div>
+      <div class="pipe-stage" data-stage="recommend"><span class="pipe-num">3</span><span class="pipe-label">AI Analysis</span><span class="pipe-status"></span></div>
+      <div class="pipe-stage" data-stage="scenarios"><span class="pipe-num">4</span><span class="pipe-label">Scenarios</span><span class="pipe-status"></span></div>
+    </div>
+    <div class="sidebar-ctx" id="sidebarCtx">
+      <div class="ctx-empty">Enter a namespace and discover</div>
+    </div>
+  </div>
+
+  <!-- ═══ Main ═══ -->
+  <div class="main">
+    <div class="main-header">
+      <h2 id="mainTitle">Chaos Simulator</h2>
+    </div>
+    <div class="main-content" id="mainContent">
+
+      <!-- Section 1: Discovery Chat -->
+      <section class="stage-section" id="sec-discover" style="display:none">
+        <div class="sec-hdr" id="chatHdr">
+          <h3>Architecture Discovery</h3>
+          <button class="btn btn-secondary btn-sm" id="btnCollapse" onclick="toggleChat()" style="display:none">Collapse</button>
+        </div>
+        <div class="chat-panel" id="chatPanel"></div>
+      </section>
+
+      <!-- Section 2: Topology -->
+      <section class="stage-section" id="sec-topology" style="display:none">
+        <div class="sec-hdr">
+          <h3>Service Topology</h3>
+          <div class="sec-actions">
+            <button class="btn btn-recommend" id="btnRec" onclick="recommend()" disabled>AI Recommend</button>
+            <button class="btn btn-secondary" id="btnGen" onclick="generate()" disabled>Generate Scenarios</button>
+          </div>
+        </div>
+        <div class="topology-canvas" id="topoCanvas"></div>
+      </section>
+
+      <!-- Section 3: AI Recommendations -->
+      <section class="stage-section" id="sec-recommend" style="display:none">
+        <div class="sec-hdr"><h3>AI Architecture Analysis</h3></div>
+        <div id="recContent"></div>
+      </section>
+
+      <!-- Section 4: Scenarios -->
+      <section class="stage-section" id="sec-scenarios" style="display:none">
+        <div class="sec-hdr">
+          <h3>Chaos Scenarios</h3>
+          <button class="btn btn-secondary btn-sm" id="btnBackList" onclick="backToList()" style="display:none">Back to List</button>
+        </div>
+        <div id="scenarioContent"></div>
+      </section>
+
+    </div>
+    <div class="status-bar">
+      <span id="statusText">Ready</span>
+      <span id="statusRight"></span>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════ State ══════════ */
+const STAGES = ['discover','topology','recommend','scenarios'];
+const PHASE_LABELS = {services:'Phase 1: Service Discovery',edges:'Phase 2: Communication Mapping',external:'Phase 3: External Dependencies',services_retry:'Phase 1: Retry',refine:'Phase 4: Quality Refinement'};
+const PHASE_ORDER = ['services','edges','external'];
+const LAYER_ORDER = ['AWS Infrastructure','Kubernetes Platform','Network','Application','Composite'];
+const LAYER_CLS = {'AWS Infrastructure':'aws','Kubernetes Platform':'kubernetes','Network':'network','Application':'application','Composite':'composite'};
+
+let S = {
+  stage:'idle', nodes:[], edges:[], scenarios:[], currentScenario:null,
+  namespace:'dockercoins', recommendations:null, conversation:[],
+  chatCollapsed:false, completedPhases:[]
+};
+
+/* ══════════ Utilities ══════════ */
+function status(m){document.getElementById('statusText').textContent=m}
+function toast(m,t='success'){const e=document.getElementById('toast');e.textContent=m;e.className=`toast show ${t}`;setTimeout(()=>e.className='toast',3000)}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+/* ══════════ State Machine ══════════ */
+function transitionTo(stage){
+  S.stage=stage;
+  updatePipeline();
+  updateSidebar();
+  document.getElementById('mainTitle').textContent={
+    idle:'Chaos Simulator',discovering:'Architecture Discovery',discovered:'Service Topology',
+    recommending:'AI Analysis',recommended:'AI Recommendations',generating:'Generating...',
+    generated:'Chaos Scenarios','viewing-scenario':'Scenario Detail'
+  }[stage]||'Chaos Simulator';
+}
+
+function updatePipeline(){
+  const stageMap={discovering:'discover',discovered:'topology',recommending:'recommend',
+    recommended:'recommend',generating:'scenarios',generated:'scenarios','viewing-scenario':'scenarios'};
+  const active=stageMap[S.stage]||null;
+  const doneSet=new Set();
+  const idx=STAGES.indexOf(active);
+  for(let i=0;i<idx;i++) doneSet.add(STAGES[i]);
+  // mark done stages based on actual state
+  if(S.nodes.length) {doneSet.add('discover');doneSet.add('topology')}
+  if(S.recommendations) doneSet.add('recommend');
+  if(S.scenarios.length) doneSet.add('scenarios');
+
+  document.querySelectorAll('.pipe-stage').forEach(el=>{
+    const s=el.dataset.stage;
+    el.className='pipe-stage';
+    if(doneSet.has(s)){el.classList.add('done');el.querySelector('.pipe-status').innerHTML='&#10003;'}
+    else if(s===active&&!doneSet.has(s)){el.classList.add('active');el.querySelector('.pipe-status').innerHTML='<span class="spinner"></span>'}
+    else{el.querySelector('.pipe-status').innerHTML=''}
+    el.onclick=doneSet.has(s)?()=>scrollToStage(s):null;
+  });
+}
+
+function scrollToStage(name){
+  const map={discover:'sec-discover',topology:'sec-topology',recommend:'sec-recommend',scenarios:'sec-scenarios'};
+  const el=document.getElementById(map[name]);
+  if(el&&el.style.display!=='none') el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function updateSidebar(){
+  const ctx=document.getElementById('sidebarCtx');
+  switch(S.stage){
+    case 'idle': ctx.innerHTML='<div class="ctx-empty">Enter a namespace and discover</div>'; break;
+    case 'discovering': renderPhaseProgress(ctx); break;
+    case 'discovered': case 'recommending': renderNodeCtx(ctx); break;
+    case 'recommended': renderRecCtx(ctx); break;
+    case 'generating': case 'generated': case 'viewing-scenario': renderScenarioCtx(ctx); break;
+  }
+}
+
+/* ══════════ Discovery (always SSE) ══════════ */
+async function discover(){
+  const ns=document.getElementById('nsInput').value.trim()||'dockercoins';
+  const btn=document.getElementById('btnStart');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Discovering...';
+  document.getElementById('nsInput').disabled=true;
+
+  S.conversation=[]; S.completedPhases=[]; S.chatCollapsed=false;
+  const panel=document.getElementById('chatPanel');
+  panel.innerHTML=''; panel.classList.remove('collapsed');
+  document.getElementById('sec-discover').style.display='';
+  document.getElementById('btnCollapse').style.display='none';
+  transitionTo('discovering');
+  addWaiting(panel,'Connecting to DevOps Agent...');
+  status(`Discovering ${ns}...`);
+
+  return new Promise(resolve=>{
+    const es=new EventSource(`/api/discover/stream?namespace=${encodeURIComponent(ns)}`);
+    es.onmessage=ev=>{
+      const d=JSON.parse(ev.data);
+      if(d.type==='qa'){
+        removeWaiting(panel);
+        addTurn(panel,d);
+        S.conversation.push(d);
+        S.completedPhases.push(d.phase);
+        updateSidebar();
+        const next=nextPhaseLabel(d.phase);
+        if(next) addWaiting(panel,next);
+        scrollBottom();
+      }
+      if(d.type==='complete'){
+        removeWaiting(panel);
+        es.close();
+        S.nodes=d.nodes; S.edges=d.edges; S.namespace=d.namespace||ns;
+        document.getElementById('sec-topology').style.display='';
+        renderTopology();
+        document.getElementById('btnRec').disabled=false;
+        document.getElementById('btnGen').disabled=false;
+        document.getElementById('btnCollapse').style.display='';
+        transitionTo('discovered');
+        status(`${d.nodes.length} services, ${d.edges.length} edges`);
+        toast(`Topology: ${d.nodes.length} services`);
+        document.getElementById('statusRight').textContent=`ns: ${S.namespace}`;
+        requestAnimationFrame(()=>document.getElementById('sec-topology').scrollIntoView({behavior:'smooth',block:'start'}));
+        btn.disabled=false; btn.innerHTML='Re-discover';
+        document.getElementById('nsInput').disabled=false;
+        resolve();
+      }
+      if(d.type==='error'){
+        removeWaiting(panel);
+        addError(panel,d.error);
+        es.close(); status('Failed'); toast(d.error,'error');
+        btn.disabled=false; btn.innerHTML='Discover Topology';
+        document.getElementById('nsInput').disabled=false;
+        resolve();
+      }
+    };
+    es.onerror=()=>{removeWaiting(panel);addError(panel,'Connection lost');es.close();
+      btn.disabled=false;btn.innerHTML='Discover Topology';document.getElementById('nsInput').disabled=false;resolve()};
+  });
+}
+
+/* ── Chat helpers ── */
+function addTurn(panel,d){
+  const phase=PHASE_LABELS[d.phase]||d.phase;
+  const result=d.data.result||{};
+  const tools=(d.data.tool_calls||[]).filter(t=>t&&t.trim());
+  const answer=(d.data.answer||'').substring(0,800);
+  let resultH='';
+  if(result.count!==undefined){
+    const names=result.names?result.names.join(', '):(result.edges?result.edges.join(', '):'');
+    resultH=`<div class="chat-result"><span class="result-badge ok">${result.count} found</span>${names?` <span style="font-size:12px;color:var(--text2);margin-left:8px">${names}</span>`:''}</div>`;
+  } else if(result.ext_nodes!==undefined){
+    resultH=`<div class="chat-result"><span class="result-badge ok">${result.ext_nodes} ext nodes, ${result.ext_edges} edges</span></div>`;
+  }
+  const toolH=tools.length?`<div class="chat-tools">${tools.map(t=>`<span class="tool-badge">${esc(t.substring(0,80))}</span>`).join('')}</div>`:'';
+  const q=esc(d.question||'').substring(0,500);
+  const el=document.createElement('div');el.className='chat-turn';
+  el.innerHTML=`<div class="chat-question"><div class="phase-badge">${phase}</div><div class="q-text">${q}</div></div>
+    ${answer?`<div class="chat-answer"><div class="a-text">${esc(answer)}</div></div>`:''}${toolH}${resultH}`;
+  panel.appendChild(el);
+}
+function addWaiting(p,label){removeWaiting(p);const e=document.createElement('div');e.className='chat-waiting';e.id='chatWait';
+  e.innerHTML=`<div class="spinner-lg"></div><div class="chat-phase-label">${label}</div>`;p.appendChild(e);scrollBottom()}
+function removeWaiting(p){const w=document.getElementById('chatWait');if(w)w.remove()}
+function addError(p,msg){const e=document.createElement('div');e.className='chat-turn';
+  e.innerHTML=`<div class="chat-result"><span class="result-badge warn">Error: ${esc(msg)}</span></div>`;p.appendChild(e)}
+function scrollBottom(){document.getElementById('mainContent').scrollTop=document.getElementById('mainContent').scrollHeight}
+function nextPhaseLabel(cur){const i=PHASE_ORDER.indexOf(cur);return i>=0&&i<PHASE_ORDER.length-1?PHASE_LABELS[PHASE_ORDER[i+1]]:null}
+function toggleChat(){
+  S.chatCollapsed=!S.chatCollapsed;
+  const p=document.getElementById('chatPanel'),b=document.getElementById('btnCollapse');
+  if(S.chatCollapsed){p.classList.add('collapsed');b.textContent='Expand'}
+  else{p.classList.remove('collapsed');b.textContent='Collapse'}
+}
+
+/* ── Sidebar: phase progress ── */
+function renderPhaseProgress(ctx){
+  const all=['services','edges','external'];
+  ctx.innerHTML=all.map(ph=>{
+    const done=S.completedPhases.includes(ph);
+    const isActive=!done&&S.completedPhases.length===all.indexOf(ph);
+    const cls=done?'done':(isActive?'active':'pending');
+    const icon=done?'&#10003;':(isActive?'<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>':'');
+    return `<div class="phase-item"><span class="phase-icon ${cls}">${icon}</span><span>${PHASE_LABELS[ph]||ph}</span></div>`;
+  }).join('');
+}
+
+/* ── Sidebar: node list ── */
+function renderNodeCtx(ctx){
+  if(!S.nodes.length){ctx.innerHTML='<div class="ctx-empty">No services</div>';return}
+  const icons={app:'⬢',cache:'◆',db:'■',gateway:'▲',queue:'●'};
+  ctx.innerHTML=S.nodes.map(n=>`<div class="ctx-item" onclick="highlightNode('${n.name}')">
+    <div class="name">${icons[n.type]||'●'} ${n.name}</div>
+    <div class="meta"><span>${n.type}</span><span>${(n.ports||[]).join(', ')}</span></div></div>`).join('');
+}
+
+/* ── Sidebar: recommendations ── */
+function renderRecCtx(ctx){
+  if(!S.recommendations){ctx.innerHTML='<div class="ctx-empty">No recommendations</div>';return}
+  const recs=S.recommendations.recommendations||[];
+  const pi={high:'&#x1F534;',medium:'&#x1F7E1;',low:'&#x1F7E2;'};
+  ctx.innerHTML=recs.map((r,i)=>`<div class="ctx-item" onclick="scrollToRec(${i})">
+    <div class="name">${pi[r.priority]||''} ${esc(r.name)}</div>
+    <div class="meta"><span>${r.template_id}</span><span>${r.priority}</span></div></div>`).join('');
+}
+
+/* ── Sidebar: scenario list ── */
+function renderScenarioCtx(ctx){
+  if(!S.scenarios.length){ctx.innerHTML='<div class="ctx-empty">No scenarios</div>';return}
+  const byL={};LAYER_ORDER.forEach(l=>byL[l]=[]);
+  S.scenarios.forEach(s=>{const l=s.layer||'Application';if(!byL[l])byL[l]=[];byL[l].push(s)});
+  let h='';
+  LAYER_ORDER.forEach(l=>{
+    const items=byL[l];if(!items||!items.length)return;
+    h+=`<div class="ctx-group-hdr"><span class="layer-dot ${LAYER_CLS[l]||'application'}"></span>${l}<span class="cnt">${items.length}</span></div>`;
+    items.forEach(s=>{h+=`<div class="ctx-item ${S.currentScenario&&S.currentScenario.id===s.id?'active':''}" data-id="${s.id}" onclick="selectScenario('${s.id}')">
+      <div class="name">${s.name}</div><div class="meta"><span>${s.category}</span><span>${s.verification_count} checks</span></div></div>`});
+  });
+  ctx.innerHTML=h;
+}
+
+/* ══════════ Recommend ══════════ */
+async function recommend(){
+  const btn=document.getElementById('btnRec');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Analyzing...';
+  document.getElementById('sec-recommend').style.display='';
+  document.getElementById('recContent').innerHTML='<div class="chat-waiting"><div class="spinner-lg"></div><div class="chat-phase-label">Bedrock Claude analyzing architecture...</div></div>';
+  transitionTo('recommending');
+  requestAnimationFrame(()=>document.getElementById('sec-recommend').scrollIntoView({behavior:'smooth'}));
+  try{
+    const res=await fetch('/api/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error);
+    S.recommendations=data.result;
+    renderRecs(data.result);
+    transitionTo('recommended');
+    status(`${data.result.recommendations.length} scenarios recommended`);
+    toast(`AI: ${data.result.recommendations.length} recommendations`);
+  }catch(e){
+    document.getElementById('recContent').innerHTML=`<div class="chat-turn"><div class="chat-result"><span class="result-badge warn">Error: ${esc(e.message)}</span></div></div>`;
+    toast(e.message,'error');status('Recommendation failed');
+  }finally{btn.disabled=false;btn.innerHTML='AI Recommend'}
+}
+
+function renderRecs(result){
+  const el=document.getElementById('recContent');
+  const a=result.architecture_analysis||{},recs=result.recommendations||[];
+  let h='<div class="rec-analysis"><h4>Architecture Analysis</h4>';
+  if(a.critical_path) h+=`<div class="rec-field"><div class="lbl">Critical Path</div><div class="val">${esc(a.critical_path)}</div></div>`;
+  if(a.single_points_of_failure&&a.single_points_of_failure.length)
+    h+=`<div class="rec-field"><div class="lbl">Single Points of Failure</div><div class="spof-list">${a.single_points_of_failure.map(s=>`<span class="spof-tag">${esc(s)}</span>`).join('')}</div></div>`;
+  if(a.risk_areas&&a.risk_areas.length){h+=`<div class="rec-field"><div class="lbl">Risk Areas</div>`;a.risk_areas.forEach(r=>{h+=`<div class="risk-item">${esc(r)}</div>`});h+='</div>'}
+  h+='</div>';
+  recs.forEach((r,i)=>{
+    const t=typeof r.target==='object'?JSON.stringify(r.target):r.target;
+    h+=`<div class="rec-card" id="rec-${i}"><div class="rec-head"><div class="rec-num">${i+1}</div><div class="rec-title">${esc(r.name)}</div>
+      <span class="priority-badge ${r.priority}">${r.priority}</span></div>
+      <div class="rec-body"><div style="margin-bottom:6px"><strong>Template:</strong> ${esc(r.template_id)}</div>
+      <div style="margin-bottom:6px"><strong>Rationale:</strong> ${esc(r.rationale)}</div>
+      ${r.expected_impact?`<div style="margin-bottom:6px"><strong>Impact:</strong> ${esc(r.expected_impact)}</div>`:''}
+      ${r.detection_challenge?`<div style="margin-bottom:6px"><strong>Detection:</strong> ${esc(r.detection_challenge)}</div>`:''}
+      ${r.additional_data_needed&&r.additional_data_needed.length?`<div><strong>Needs:</strong> ${r.additional_data_needed.join(', ')}</div>`:''}</div>
+      <div class="rec-target">${esc(t.substring(0,150))}</div></div>`;
+  });
+  el.innerHTML=h;
+}
+function scrollToRec(i){const el=document.getElementById(`rec-${i}`);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})}
+
+/* ══════════ Generate ══════════ */
+async function generate(){
+  const btn=document.getElementById('btnGen');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  document.getElementById('sec-scenarios').style.display='';
+  document.getElementById('scenarioContent').innerHTML='<div class="chat-waiting"><div class="spinner-lg"></div><div class="chat-phase-label">Generating scenarios...</div></div>';
+  document.getElementById('btnBackList').style.display='none';
+  transitionTo('generating');
+  requestAnimationFrame(()=>document.getElementById('sec-scenarios').scrollIntoView({behavior:'smooth'}));
+  try{
+    const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error);
+    S.scenarios=data.scenarios; S.currentScenario=null;
+    renderScenarioCards(data.scenarios);
+    transitionTo('generated');
+    status(`${data.count} scenarios generated`);
+    toast(`${data.count} scenarios`);
+  }catch(e){toast(e.message,'error');status('Generation failed')}
+  finally{btn.disabled=false;btn.innerHTML='Generate Scenarios'}
+}
+
+function renderScenarioCards(scenarios){
+  const el=document.getElementById('scenarioContent');
+  if(!scenarios.length){el.innerHTML='<div class="ctx-empty">No scenarios generated</div>';return}
+  const byL={};LAYER_ORDER.forEach(l=>byL[l]=[]);
+  scenarios.forEach(s=>{const l=s.layer||'Application';if(!byL[l])byL[l]=[];byL[l].push(s)});
+  let h='';
+  LAYER_ORDER.forEach(l=>{
+    const items=byL[l];if(!items||!items.length)return;
+    h+=`<div class="sec-hdr" style="margin-top:16px"><h3 style="font-size:14px"><span class="layer-dot ${LAYER_CLS[l]||'application'}"></span> ${l}</h3></div>`;
+    items.forEach(s=>{
+      h+=`<div class="rec-card" style="cursor:pointer" onclick="selectScenario('${s.id}')">
+        <div class="rec-head"><div class="rec-title">${s.name}</div></div>
+        <div class="rec-body"><span>${s.category}</span> &middot; ${s.verification_count} checks &middot; ${s.fault_flow_count} fault steps</div></div>`;
+    });
+  });
+  el.innerHTML=h;
+}
+
+/* ══════════ Scenario Detail ══════════ */
+async function selectScenario(id){
+  status(`Loading ${id}...`);
+  try{
+    const res=await fetch(`/api/scenarios/${id}`);const data=await res.json();
+    if(!data.ok)throw new Error(data.error);
+    S.currentScenario=data.scenario;
+    renderDetail(data.scenario);
+    document.getElementById('btnBackList').style.display='';
+    transitionTo('viewing-scenario');
+    status(`Viewing: ${data.scenario.name}`);
+    document.getElementById('sec-scenarios').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){toast(e.message,'error')}
+}
+
+function backToList(){
+  S.currentScenario=null;
+  renderScenarioCards(S.scenarios);
+  document.getElementById('btnBackList').style.display='none';
+  transitionTo('generated');
+}
+
+function renderDetail(s){
+  const el=document.getElementById('scenarioContent');
+  el.innerHTML=`
+    <div class="detail-tabs">
+      <div class="detail-tab active" onclick="dtab('overview')">Overview</div>
+      <div class="detail-tab" onclick="dtab('normal-flow')">Normal Flow</div>
+      <div class="detail-tab" onclick="dtab('fault-flow')">Fault Flow</div>
+      <div class="detail-tab" onclick="dtab('verification')">Verification</div>
+      <div class="detail-tab" onclick="dtab('trigger')">Trigger</div>
+      <div class="detail-tab" onclick="dtab('editor')">Editor</div>
+    </div>
+    <div class="tab-panel active" id="detail-overview"></div>
+    <div class="tab-panel" id="detail-normal-flow"></div>
+    <div class="tab-panel" id="detail-fault-flow"></div>
+    <div class="tab-panel" id="detail-verification"></div>
+    <div class="tab-panel" id="detail-trigger"></div>
+    <div class="tab-panel" id="detail-editor"></div>`;
+  renderOverview(s);renderNormalFlow(s);renderFaultFlow(s);renderVerification(s);renderTrigger(s);renderEditor(s);
+}
+
+function dtab(t){
+  document.querySelectorAll('#scenarioContent .detail-tab').forEach(e=>e.classList.toggle('active',e.getAttribute('onclick')===`dtab('${t}')`));
+  document.querySelectorAll('#scenarioContent .tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`detail-${t}`).classList.add('active');
+}
+
+function renderOverview(s){
+  const sum=s.summary||{},ctx=s.topology_context||{};
+  let crit='';if(sum.success_criteria&&sum.success_criteria.length) crit=`<div class="summary-field"><div class="label">Success Criteria</div><ul class="criteria-list">${sum.success_criteria.map(c=>`<li>${c}</li>`).join('')}</ul></div>`;
+  document.getElementById('detail-overview').innerHTML=`<div class="summary-card">
+    <div class="summary-field"><div class="label">Objective</div><div class="value">${sum.objective||'-'}</div></div>
+    <div class="summary-field"><div class="label">Description</div><div class="value">${sum.description||'-'}</div></div>
+    <div class="summary-field"><div class="label">Expected Root Cause</div><div class="value">${sum.expected_root_cause||'-'}</div></div>
+    <div class="summary-field"><div class="label">Detection Challenge</div><div class="value">${sum.detection_challenge||'-'}</div></div>
+    ${crit}
+    <div class="summary-field"><div class="label">Topology Context</div><div class="value">
+      <strong>Fault Target:</strong> ${ctx.fault_target||'-'}<br>
+      <strong>Affected:</strong> ${(ctx.affected_callers||ctx.affected_services||[]).join(', ')||'-'}<br>
+      <strong>Scope:</strong> ${ctx.scope||(ctx.edge?'edge':'node')}</div></div></div>`;
+}
+function renderNormalFlow(s){
+  const el=document.getElementById('detail-normal-flow'),flow=s.normal_flow||[];
+  if(!flow.length){el.innerHTML='<p style="color:var(--text2)">No normal flow</p>';return}
+  let h='<div class="flow-container">';
+  flow.forEach((st,i)=>{if(i)h+='<div class="flow-connector"></div>';
+    h+=`<div class="flow-step"><div class="flow-icon normal">${i+1}</div><div class="flow-body"><div class="flow-title">${st.step}</div><div class="flow-desc">${st.desc||''}</div>${st.from&&st.to?`<div class="flow-target">${st.from} → ${st.to}</div>`:''}</div></div>`});
+  el.innerHTML=h+'</div>';
+}
+function renderFaultFlow(s){
+  const el=document.getElementById('detail-fault-flow'),flow=s.fault_flow||[];
+  if(!flow.length){el.innerHTML='<p style="color:var(--text2)">No fault flow</p>';return}
+  const ic={red:'⚠',yellow:'⚡',green:'✓',normal:'●'};let h='<div class="flow-container">';
+  flow.forEach((st,i)=>{if(i)h+='<div class="flow-connector"></div>';const c=st.icon||'normal';
+    h+=`<div class="flow-step"><div class="flow-icon ${c}">${ic[c]||'●'}</div><div class="flow-body"><div class="flow-title">${st.step}</div><div class="flow-desc">${st.desc||''}</div>${st.target?`<div class="flow-target">Target: ${st.target}</div>`:''}</div></div>`});
+  el.innerHTML=h+'</div>';
+}
+function renderVerification(s){
+  const el=document.getElementById('detail-verification'),steps=s.verification||[];
+  if(!steps.length){el.innerHTML='<p style="color:var(--text2)">No verification</p>';return}
+  el.innerHTML=steps.map((v,i)=>`<div class="verify-step"><div class="num">${i+1}</div><div class="verify-body">
+    <div class="verify-name">${v.name}</div><div class="verify-meta">${v.type} | timeout: ${v.timeout||60}s | ${v.namespace||''} ${v.deployment||''} ${v.pattern?'| '+v.pattern:''}</div></div></div>`).join('');
+}
+function renderTrigger(s){
+  const t=s.trigger||{},r=s.restore||{};
+  document.getElementById('detail-trigger').innerHTML=`<div style="margin-bottom:24px"><h3 style="font-size:14px;margin-bottom:12px">Trigger (${t.type||''})</h3>
+    <div class="yaml-block"><pre>${esc(t.yaml||JSON.stringify(t,null,2))}</pre></div></div>
+    <div><h3 style="font-size:14px;margin-bottom:12px">Restore</h3><div class="yaml-block"><pre>${esc(JSON.stringify(r,null,2))}</pre></div></div>`;
+}
+function renderEditor(s){
+  const sum=s.summary||{};
+  document.getElementById('detail-editor').innerHTML=`<div class="summary-card">
+    <div class="editor-field"><label>Objective</label><textarea id="ed-obj">${sum.objective||''}</textarea></div>
+    <div class="editor-field"><label>Description</label><textarea id="ed-desc">${sum.description||''}</textarea></div>
+    <div class="editor-field"><label>Expected Root Cause</label><input id="ed-rc" value="${sum.expected_root_cause||''}"></div>
+    <div class="editor-field"><label>Detection Challenge</label><textarea id="ed-det">${sum.detection_challenge||''}</textarea></div>
+    <div class="editor-field"><label>Success Criteria (one per line)</label><textarea id="ed-crit">${(sum.success_criteria||[]).join('\n')}</textarea></div>
+    <button class="btn btn-primary" onclick="saveScenario()">Save Changes</button></div>`;
+}
+async function saveScenario(){
+  if(!S.currentScenario)return;const id=S.currentScenario.id;
+  const u={summary:{objective:document.getElementById('ed-obj').value,description:document.getElementById('ed-desc').value,
+    expected_root_cause:document.getElementById('ed-rc').value,detection_challenge:document.getElementById('ed-det').value,
+    success_criteria:document.getElementById('ed-crit').value.split('\n').filter(l=>l.trim())}};
+  try{const res=await fetch(`/api/scenarios/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)});
+    const data=await res.json();if(!data.ok)throw new Error(data.error);
+    S.currentScenario=data.scenario;renderOverview(data.scenario);toast('Saved');
+  }catch(e){toast(e.message,'error')}
+}
+
+/* ══════════ Topology rendering ══════════ */
+function renderTopology(){
+  const c=document.getElementById('topoCanvas');
+  if(!S.nodes.length){c.innerHTML='<div class="topo-empty"><span class="hint">No services</span></div>';return}
+  const W=c.clientWidth,H=Math.max(400,c.clientHeight);
+  const icons={app:'\u{1F4E6}',cache:'\u{1F5C4}',db:'\u{1F4BE}',gateway:'\u{1F310}',queue:'\u{1F4EC}'};
+  const pos=layoutNodes(S.nodes,S.edges,W,H);
+  let h=`<svg class="topo-svg" viewBox="0 0 ${W} ${H}"><defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6366f1"/></marker></defs>`;
+  S.edges.forEach(e=>{const f=pos[e.source],t=pos[e.target];if(f&&t){const mx=(f.x+t.x)/2,my=(f.y+t.y)/2;
+    h+=`<line x1="${f.x}" y1="${f.y}" x2="${t.x}" y2="${t.y}" marker-end="url(#arrow)" stroke="#4f5270" stroke-width="2"/>`;
+    h+=`<text x="${mx}" y="${my-6}" text-anchor="middle">${e.protocol||''}${e.port?':'+e.port:''}</text>`}});
+  h+='</svg>';
+  S.nodes.forEach(n=>{const p=pos[n.name];if(p)h+=`<div class="topo-node" id="topo-${n.name}" style="left:${p.x-50}px;top:${p.y-35}px">
+    <div class="icon">${icons[n.type]||'\u{1F4E6}'}</div><div class="label">${n.name}</div><div class="type">${n.type}</div></div>`});
+  c.innerHTML=h;c.style.height=H+'px';
+}
+function layoutNodes(nodes,edges,W,H){
+  const pos={},inD={},outD={};nodes.forEach(n=>{inD[n.name]=0;outD[n.name]=0});
+  edges.forEach(e=>{outD[e.source]=(outD[e.source]||0)+1;inD[e.target]=(inD[e.target]||0)+1});
+  const src=nodes.filter(n=>inD[n.name]===0&&outD[n.name]>0);
+  const snk=nodes.filter(n=>outD[n.name]===0&&inD[n.name]>0);
+  const mid=nodes.filter(n=>inD[n.name]>0&&outD[n.name]>0);
+  const iso=nodes.filter(n=>inD[n.name]===0&&outD[n.name]===0);
+  const cols=[src,mid.length?mid:iso,snk],xP=[W*.2,W*.5,W*.8];
+  cols.forEach((c,ci)=>c.forEach((n,i)=>{pos[n.name]={x:xP[ci],y:H/(c.length+1)*(i+1)}}));
+  iso.forEach((n,i)=>{if(!pos[n.name])pos[n.name]={x:W*.5,y:H-60*(i+1)}});
+  return pos;
+}
+function highlightNode(name){document.querySelectorAll('.topo-node').forEach(n=>n.style.borderColor='');
+  const el=document.getElementById(`topo-${name}`);if(el)el.style.borderColor='var(--accent)'}
+
+/* ══════════ Init ══════════ */
+(async function(){
+  let hasTopo=false,hasScen=false;
+  try{const r=await fetch('/api/topology');const d=await r.json();
+    if(d.ok&&d.nodes&&d.nodes.length){S.nodes=d.nodes;S.edges=d.edges;S.namespace=d.namespace;
+      document.getElementById('nsInput').value=d.namespace;hasTopo=true}}catch(e){}
+  try{const r=await fetch('/api/scenarios');const d=await r.json();
+    if(d.scenarios&&d.scenarios.length){S.scenarios=d.scenarios;hasScen=true}}catch(e){}
+  if(hasTopo){
+    document.getElementById('sec-topology').style.display='';renderTopology();
+    document.getElementById('btnRec').disabled=false;document.getElementById('btnGen').disabled=false;
+    if(hasScen){document.getElementById('sec-scenarios').style.display='';renderScenarioCards(S.scenarios);transitionTo('generated')}
+    else transitionTo('discovered');
+    document.getElementById('statusRight').textContent=`ns: ${S.namespace}`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+{
+  "id": "C05-service",
+  "name": "Service Dependency Failure",
+  "category": "multi-service",
+  "layer": "Composite → Dependency",
+  "purpose": "마이크로서비스 의존성 장애 분석",
+  "flow": [
+    "hasher Deployment를 0으로 스케일 다운",
+    "Worker에서 hasher 연결 실패",
+    "의존성 장애로 인한 연쇄 에러"
+  ],
+  "architecture": {
+    "components": [
+      {"id": "worker", "label": "Worker", "type": "app", "desc": "채굴 파이프라인 조율 — hasher/rng 호출 후 Redis 저장"},
+      {"id": "hasher", "label": "Hasher", "type": "app", "desc": "SHA256 해시 계산 서비스 (Worker의 의존성)"},
+      {"id": "rng", "label": "RNG", "type": "app", "desc": "난수 생성 서비스"},
+      {"id": "redis", "label": "Redis", "type": "infra", "desc": "인메모리 상태 저장소"},
+      {"id": "webui", "label": "WebUI", "type": "app", "desc": "채굴 통계 실시간 대시보드"},
+      {"id": "cw", "label": "CloudWatch", "type": "aws", "desc": "알람 모니터링"}
+    ],
+    "edges": [
+      {"from": "worker", "to": "hasher", "label": "POST / (HTTP)"},
+      {"from": "worker", "to": "rng", "label": "GET /32 (HTTP)"},
+      {"from": "worker", "to": "redis", "label": "HSET/INCRBY"},
+      {"from": "webui", "to": "redis", "label": "HGETALL"},
+      {"from": "hasher", "to": "cw", "label": "faults 메트릭"}
+    ],
+    "fault_path": ["hasher", "worker", "webui"]
+  },
+  "normal_flow": [
+    {"step": "Worker → Hasher", "desc": "Worker가 Hasher에 해시 계산 요청 (POST /)"},
+    {"step": "Worker → RNG", "desc": "Worker가 RNG에 난수 요청 (GET /32)"},
+    {"step": "Worker → Redis", "desc": "Worker가 결과를 Redis에 저장 (HSET/INCRBY)"},
+    {"step": "WebUI → Redis", "desc": "WebUI가 Redis에서 채굴 통계 조회 (HGETALL)"}
+  ],
+  "fault_flow": [
+    {"step": "Hasher 스케일 0", "desc": "hasher Deployment를 0으로 스케일 다운 — 서비스 완전 중단"},
+    {"step": "Worker 연결 실패", "desc": "Worker의 POST / 요청이 ConnectionError로 전부 실패"},
+    {"step": "WebUI 통계 정체", "desc": "Redis에 새 데이터가 안 쌓여 대시보드 정체"}
+  ],
+  "expected_root_cause": "Root Cause: hasher 서비스 다운 (NOT worker 코드 버그)",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl scale deployment hasher -n dockercoins --replicas=0"
+  },
+  "restore": {
+    "command": "kubectl scale deployment hasher -n dockercoins --replicas=1"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "Hasher 종료 확인",
+        "type": "pod_status",
+        "pod": "hasher",
+        "expected": "NotReady",
+        "timeout": 30,
+        "poll_interval": 3
+      },
+      {
+        "name": "Worker 연결 에러 확인",
+        "type": "pod_logs",
+        "pod": "worker",
+        "pattern": "ConnectionError|hasher|Max retries exceeded",
+        "tail": 300,
+        "timeout": 45,
+        "poll_interval": 3
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 서비스 간 연쇄 장애임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "X-Ray",
+        "CloudWatch",
+        "K8s"
+      ],
+      "criteria": "X-Ray 트레이스, CloudWatch 메트릭, K8s 상태를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "서비스 장애 전파 경로를 정확히 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "관련 서비스 코드를 분석했는가"
+    }
+  }
+}

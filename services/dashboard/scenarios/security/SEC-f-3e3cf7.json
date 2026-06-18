@@ -1,0 +1,70 @@
+{
+  "id": "SEC-f-3e3cf7",
+  "devops_space_id": "as-e558819b-a2e2-460b-85ff-1a58004f9f58",
+  "name": "Stored Command Injection via Scenario Restore Execution Path (POST /api/scenario-run/{run_id}/restore)",
+  "description": "The application's scenario restore execution path at POST /api/scenario-run/{run_id}/restore contains a command injection vulnerability through unsanitized execution of stored scenario data. The attack chain involves:\n\n1. An attacker stores a scenario with a malicious `restore.command` field via POST /api/arch/save-scenario. The validate-scenario endpoint confirms that arbitrary shell metacharacters (`;`, `|`, `&&`, `$()`, backticks) pass validation with zero errors.\n\n2. A run is started via POST /api/scenario-run/{scenario_id} which loads the scenario and creates an active run in memory.\n\n3. POST /api/scenario-run/{run_id}/restore reads `restore.command` from the stored scenario (line 1089), passes it through `cluster_manager.inject_context()` which only adds kubectl/aws context flags and performs NO sanitization of shell metacharacters (line 1093), then calls `_run_cmd(restore_cmd, timeout=60)` (line 1094) which executes `subprocess.run([\"bash\", \"-c\", cmd])` (verifier_utils.py line 113).\n\nNo authentication is required on any endpoint in this chain. The inject_context() function only processes kubectl/aws-specific context injection and leaves all shell metacharacters intact. Commands execute as root (uid=0) on a Kubernetes pod. The vulnerability was confirmed by directly executing the exact code path functions with malicious payloads, demonstrating arbitrary command execution as root.",
+  "category": "security-evil",
+  "app_name": "evil",
+  "layer": "app",
+  "target_service": "evil",
+  "failure_mode": "COMMAND_INJECTION",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "COMMAND_INJECTION 취약점 — Stored Command Injection via Scenario Restore Execution Path (POST /api/scenario-run/{run_id}/restore)",
+  "source": "security-agent",
+  "finding_id": "f-3e3cf70e-75c2-481e-bc92-f0990a8e6bc0",
+  "risk_level": "CRITICAL",
+  "risk_type": "COMMAND_INJECTION",
+  "endpoint": "http://evil.com",
+  "attack_steps": [
+    {
+      "method": "POST",
+      "path": "/api/validate-scenario",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/x/exec-cmd",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/any-run-id/restore",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "evil",
+      "label": "/api/validate-scenario"
+    }
+  ],
+  "registered_at": "2026-06-09T11:04:12.014046+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: COMMAND_INJECTION on evil\n# Endpoint: http://evil.com/api/validate-scenario"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "COMMAND_INJECTION 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

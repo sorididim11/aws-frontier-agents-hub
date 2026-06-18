@@ -1,0 +1,62 @@
+{
+  "id": "SEC-f-91bebb",
+  "devops_space_id": "7e86205f-79ea-4992-b1f3-eb5d24a1a439",
+  "name": "Unauthenticated Kubernetes Cluster Compromise via Command Injection and Overly Permissive ClusterRole (pods/exec across all namespaces)",
+  "description": "An unauthenticated attacker can escalate from anonymous web user to full Kubernetes cluster access by chaining the command injection vulnerability in POST /api/scenario-run/{run_id}/exec-cmd with an overly permissive ClusterRole bound to the dashboard's service account (system:serviceaccount:overview:overview).\n\nThe attack chain proceeds as follows:\n1. Start a scenario run without any authentication via POST /api/scenario-run/FM-01-network-isolation, receiving a run_id.\n2. Execute arbitrary OS commands as root via POST /api/scenario-run/{run_id}/exec-cmd with no authentication required.\n3. Use the pre-installed kubectl binary with the service account's ClusterRole permissions to exec into pods across all namespaces.\n\nThe ClusterRole grants critical permissions across ALL namespaces:\n- pods, pods/exec, pods/log: get, list, watch, create, delete\n- deployments, deployments/scale: get, list, watch, patch, update\n- services, configmaps, events: get, list, watch\n- networkpolicies: get, list, watch, create, delete\n\nDemonstrated impacts:\n- K8s Secret Extraction: The rng deployment in dockercoins namespace exposes the K8s secret 'rds-credentials' as environment variables. Via pods/exec, the attacker extracts full RDS database credentials (host, port, dbname, user, password).\n- AWS IAM Role Credential Theft: The overview pod has an IRSA token mounted at /var/run/secrets/eks.amazonaws.com/serviceaccount/token. This JWT (audience: sts.amazonaws.com) can be used with AWS STS AssumeRoleWithWebIdentity to obtain temporary AWS credentials for role arn:aws:iam::111111111111:role/devops-agent-test-dashboard-role.\n- Cluster-Wide Lateral Movement: Confirmed pods/exec permission into kube-system pods, enabling access to cluster infrastructure components.\n- Pod Creation: The attacker can create new pods that mount any secret in the namespace as a volume, bypassing the lack of direct 'get secrets' API permission.\n\nWhile direct secrets get is denied (`kubectl auth can-i get secrets --all-namespaces` returns \"no\"), the pods/exec and pod create permissions effectively bypass this restriction entirely.",
+  "category": "security-FrontierAgentHub",
+  "app_name": "FrontierAgentHub",
+  "layer": "app+infra",
+  "target_service": "FrontierAgentHub",
+  "failure_mode": "PRIVILEGE_ESCALATION",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "PRIVILEGE_ESCALATION 취약점 — Unauthenticated Kubernetes Cluster Compromise via Command Injection and Overly Permissive ClusterRole (pods/exec across all namespaces)",
+  "source": "security-agent",
+  "finding_id": "f-91bebb13-f717-41b8-828a-c765272bded5",
+  "risk_level": "CRITICAL",
+  "risk_type": "PRIVILEGE_ESCALATION",
+  "endpoint": "http://dashboard.es-devops-agent.com/api/scenario-run",
+  "attack_steps": [
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/FM-01-network-isolation",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/742089a4/exec-cmd",
+      "headers": {},
+      "body": "{\"command\": \"id && whoami\"}",
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "dashboard",
+      "label": "/api/scenario-run/FM-01-network-isolation"
+    }
+  ],
+  "registered_at": "2026-06-15T08:09:59.348451+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: PRIVILEGE_ESCALATION on dashboard\n# Endpoint: http://dashboard.es-devops-agent.com/api/scenario-run/api/scenario-run/FM-01-network-isolation"
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "PRIVILEGE_ESCALATION 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

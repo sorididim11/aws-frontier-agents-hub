@@ -1,0 +1,95 @@
+name: Build and Push Dashboard to ECR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/dashboard/**'
+      - '.github/workflows/build-push-ecr.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target AWS account'
+        required: true
+        default: 'member1-acc'
+        type: choice
+        options:
+          - member1-acc
+          - member2-acc
+
+env:
+  AWS_REGION: us-east-1
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'member1-acc' }}
+    outputs:
+      ecr_registry: ${{ steps.env-map.outputs.ecr_registry }}
+      project_name: ${{ steps.env-map.outputs.project_name }}
+      iam_role: ${{ steps.env-map.outputs.iam_role }}
+      cluster_name: ${{ steps.env-map.outputs.cluster_name }}
+      overlay_dir: ${{ steps.env-map.outputs.overlay_dir }}
+    steps:
+      - name: Derive variables from environment
+        id: env-map
+        run: |
+          ACCT="${{ vars.AWS_ACCOUNT_ID }}"
+          PRJ="${{ vars.PROJECT_NAME }}"
+          echo "ecr_registry=${ACCT}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_OUTPUT
+          echo "project_name=${PRJ}" >> $GITHUB_OUTPUT
+          echo "iam_role=${{ vars.IAM_ROLE_ARN || format('arn:aws:iam::{0}:role/{1}-github-actions-role', vars.AWS_ACCOUNT_ID, vars.PROJECT_NAME) }}" >> $GITHUB_OUTPUT
+          echo "cluster_name=${PRJ}-cluster" >> $GITHUB_OUTPUT
+          echo "overlay_dir=${{ github.event.inputs.environment || 'member1-acc' }}" >> $GITHUB_OUTPUT
+
+  build-dashboard:
+    needs: [setup]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.setup.outputs.iam_role }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push dashboard
+        uses: docker/build-push-action@v5
+        with:
+          context: services/dashboard
+          push: true
+          tags: |
+            ${{ needs.setup.outputs.ecr_registry }}/${{ needs.setup.outputs.project_name }}/dashboard:${{ github.sha }}
+          platforms: linux/amd64
+
+  deploy-to-eks:
+    needs: [setup, build-dashboard]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.setup.outputs.iam_role }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ needs.setup.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
+      - name: Deploy dashboard
+        working-directory: infrastructure/kubernetes/overlays/${{ needs.setup.outputs.overlay_dir }}/dashboard
+        run: |
+          TAG="${{ github.sha }}"
+          ECR="${{ needs.setup.outputs.ecr_registry }}"
+          PRJ="${{ needs.setup.outputs.project_name }}"
+          kustomize edit set image dashboard=${ECR}/${PRJ}/dashboard:${TAG}
+          kustomize build . | grep "image:" || true
+          kubectl apply -k .
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/dashboard -n dashboard --timeout=120s || true
+          kubectl get pods -n dashboard

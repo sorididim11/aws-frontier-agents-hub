@@ -1,0 +1,21 @@
+{
+    "id": "restore-hasher",
+    "name": "Restore Hasher",
+    "category": "cleanup",
+    "layer": "Utility",
+    "purpose": "hasher replicas=1로 복구",
+    "flow": [
+        "hasher Deployment를 1 replica로 복구"
+    ],
+    "expected_root_cause": "",
+    "trigger": {
+        "type": "kubectl",
+        "command": "kubectl scale deployment hasher -n dockercoins --replicas=1"
+    },
+    "restore": {
+        "command": ""
+    },
+    "verification": {
+        "steps": []
+    }
+}

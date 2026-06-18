@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Frontier Agent Hub — 초기 설정</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.wizard { width: 640px; background: #1e293b; border-radius: 12px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+.wizard h1 { font-size: 1.5rem; margin-bottom: 8px; color: #f8fafc; }
+.wizard .subtitle { color: #94a3b8; margin-bottom: 32px; font-size: 0.9rem; }
+.steps { display: flex; gap: 8px; margin-bottom: 32px; }
+.step-indicator { flex: 1; height: 4px; border-radius: 2px; background: #334155; transition: background 0.3s; }
+.step-indicator.active { background: #38bdf8; }
+.step-indicator.done { background: #22c55e; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+.profile-list { max-height: 280px; overflow-y: auto; margin: 16px 0; }
+.profile-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #0f172a; border-radius: 8px; margin-bottom: 8px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+.profile-item:hover { border-color: #334155; }
+.profile-item.selected { border-color: #38bdf8; }
+.profile-item .name { font-weight: 500; }
+.profile-item .status { font-size: 0.8rem; color: #64748b; }
+.profile-item .status.valid { color: #22c55e; }
+.profile-item .status.invalid { color: #ef4444; }
+.btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500; transition: opacity 0.2s; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: #38bdf8; color: #0f172a; }
+.btn-secondary { background: #334155; color: #e2e8f0; }
+.btn-row { display: flex; justify-content: space-between; margin-top: 24px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.info-card { background: #0f172a; border-radius: 8px; padding: 16px; }
+.info-card .label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+.info-card .value { font-size: 1.1rem; color: #f8fafc; word-break: break-all; }
+.info-card .value.zero { color: #64748b; }
+.discovery-section { margin: 12px 0; }
+.discovery-section h3 { font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px; }
+.discovery-item { padding: 8px 12px; background: #0f172a; border-radius: 6px; margin-bottom: 4px; font-size: 0.85rem; }
+.loading { text-align: center; padding: 40px; color: #64748b; }
+.summary-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+.summary-table td { padding: 10px 12px; border-bottom: 1px solid #334155; }
+.summary-table td:first-child { color: #94a3b8; width: 120px; }
+.region-select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 16px; }
+.auth-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: #0f172a; border-radius: 8px; padding: 4px; }
+.auth-tab { flex: 1; padding: 8px; border: none; border-radius: 6px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+.auth-tab.active { background: #334155; color: #f8fafc; }
+.input-field { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 10px 12px; border-radius: 6px; font-size: 0.9rem; outline: none; }
+.input-field:focus { border-color: #38bdf8; }
+</style>
+</head>
+<body>
+<div class="wizard">
+  <h1>Frontier Agent Hub 초기 설정</h1>
+  <p class="subtitle">AWS 프로파일을 선택하고 대상 환경을 설정합니다.</p>
+
+  <div class="steps">
+    <div class="step-indicator active" id="ind-0"></div>
+    <div class="step-indicator" id="ind-1"></div>
+    <div class="step-indicator" id="ind-2"></div>
+  </div>
+
+  <!-- Step 1: 크레덴셜 설정 -->
+  <div class="step-panel active" id="step-0">
+    <h2 style="font-size:1.1rem; margin-bottom:12px;">AWS 크레덴셜 설정</h2>
+
+    <!-- 리전 -->
+    <div style="margin-bottom:16px;">
+      <label style="font-size:0.8rem; color:#94a3b8; display:block; margin-bottom:4px;">리전</label>
+      <input type="text" class="input-field" id="regionInput" value="us-east-1" placeholder="예: us-east-1, ap-northeast-2">
+    </div>
+
+    <!-- 프로파일 경로 -->
+    <div style="display:flex; gap:8px; margin-bottom:16px; align-items:center;">
+      <input type="text" class="input-field" id="awsConfigPath" placeholder="~/.aws (기본 경로 또는 직접 입력)" style="flex:1;">
+      <button class="btn btn-secondary" onclick="loadProfiles(document.getElementById('awsConfigPath').value)">탐색</button>
+    </div>
+
+    <!-- 배포 계정 (필수) -->
+    <div style="margin-bottom:20px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <h3 style="font-size:0.95rem; color:#f8fafc;">배포 계정</h3>
+        <span style="font-size:0.7rem; background:#38bdf8; color:#0f172a; padding:2px 6px; border-radius:4px;">필수</span>
+      </div>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:8px;">Frontier Agent Hub이 실행되고 DynamoDB 등 리소스가 생성되는 계정</p>
+      <div class="profile-list" id="deployProfileList" style="max-height:160px;">
+        <div class="loading">프로파일 탐색 중...</div>
+      </div>
+      <div id="deployStatus" style="margin-top:4px; font-size:0.8rem;"></div>
+    </div>
+
+    <!-- Management 계정 (선택) -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <h3 style="font-size:0.95rem; color:#f8fafc;">Management 계정</h3>
+        <span style="font-size:0.7rem; background:#334155; color:#94a3b8; padding:2px 6px; border-radius:4px;">선택</span>
+      </div>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:8px;">Organizations API로 전체 계정 디스커버리 (미선택 시 배포 계정 내에서만 탐색)</p>
+      <div class="profile-list" id="mgmtProfileList" style="max-height:160px;">
+        <div class="loading">프로파일 탐색 중...</div>
+      </div>
+      <div id="mgmtStatus" style="margin-top:4px; font-size:0.8rem;"></div>
+    </div>
+
+    <div class="btn-row">
+      <span></span>
+      <button class="btn btn-primary" id="btnNext1" disabled onclick="goStep(1)">다음</button>
+    </div>
+  </div>
+
+  <!-- Step 2: 데이터 저장소 확인 -->
+  <div class="step-panel" id="step-1">
+    <h2 style="font-size:1.1rem; margin-bottom:12px;">데이터 저장소 확인</h2>
+
+    <div style="background:#0f172a; border-radius:8px; padding:16px; margin-bottom:16px; border-left:3px solid #38bdf8;">
+      <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
+        <strong style="color:#f8fafc;">Frontier Agent Hub</strong>은 DevOps Agent와 Security Agent를 활용하여
+        인프라 토폴로지 분석, 장애 시나리오 생성/실행, 보안 인사이트를 제공합니다.<br>
+        앱 상태 관리를 위해 DynamoDB 테이블이 필요합니다.
+        아래에서 기존 테이블을 확인하거나 새로 생성할 수 있습니다.
+      </p>
+    </div>
+
+    <div class="info-grid" id="accountInfo"></div>
+
+    <div style="margin:16px 0;">
+      <label style="font-size:0.8rem; color:#94a3b8; display:block; margin-bottom:4px;">테이블 프리픽스</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" class="input-field" id="ddbPrefix" value="frontier-agent-hub" style="flex:1;">
+        <button class="btn btn-secondary" onclick="runDiscovery()">재검색</button>
+      </div>
+    </div>
+
+    <div id="discoveryResults"><div class="loading">스캔 중...</div></div>
+
+    <!-- Expert Agent CLI 감지 -->
+    <div class="discovery-section" style="margin-top:20px;">
+      <h3>Expert Agent CLI</h3>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:8px;">웹 채팅을 통한 앱 관리/분석을 위해 로컬 AI CLI를 감지합니다.</p>
+      <div id="expertCliResults"><div class="loading">CLI 감지 중...</div></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goStep(0)">이전</button>
+      <button class="btn btn-primary" id="btnNext2" disabled onclick="goStep(2)">다음</button>
+    </div>
+  </div>
+
+  <!-- Step 3: 확인 & 저장 -->
+  <div class="step-panel" id="step-2">
+    <h2 style="font-size:1.1rem; margin-bottom:12px;">설정 확인</h2>
+    <table class="summary-table" id="summaryTable"></table>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goStep(1)">이전</button>
+      <button class="btn btn-primary" id="btnSave" onclick="saveAndStart()">설정 저장 & 시작</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let state = {
+  deploy_profile: '', deploy_account_id: '', deploy_arn: '',
+  mgmt_profile: '', mgmt_account_id: '', mgmt_arn: '',
+  region: 'us-east-1', discovery: null, prefix: 'frontier-agent-hub',
+  expert_providers: {}
+};
+
+function goStep(n) {
+  document.querySelectorAll('.step-panel').forEach((el, i) => {
+    el.classList.toggle('active', i === n);
+  });
+  document.querySelectorAll('.step-indicator').forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  });
+  if (n === 1) runDiscovery();
+  if (n === 2) showSummary();
+}
+
+function checkStep1Ready() {
+  document.getElementById('btnNext1').disabled = !state.deploy_profile;
+}
+
+async function loadProfiles(configPath) {
+  const params = configPath ? '?path=' + encodeURIComponent(configPath) : '';
+  const res = await fetch('/api/setup/profiles' + params);
+  const data = await res.json();
+
+  renderProfileList('deployProfileList', data.profiles, 'deploy');
+  renderProfileList('mgmtProfileList', data.profiles, 'mgmt');
+}
+
+function renderProfileList(containerId, profiles, role) {
+  const list = document.getElementById(containerId);
+  if (!profiles.length) {
+    list.innerHTML = '<div class="loading">프로파일이 없습니다.</div>';
+    return;
+  }
+  list.innerHTML = profiles.map(p =>
+    `<div class="profile-item" onclick="selectProfile('${p}', '${role}')">
+      <span class="name">${p}</span>
+      <span class="status" id="status-${role}-${p}">—</span>
+    </div>`
+  ).join('');
+}
+
+async function selectProfile(name, role) {
+  const containerId = role === 'deploy' ? 'deployProfileList' : 'mgmtProfileList';
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.profile-item').forEach(el => el.classList.remove('selected'));
+  const item = [...container.querySelectorAll('.profile-item')].find(el => el.querySelector('.name').textContent === name);
+  if (item) item.classList.add('selected');
+
+  const statusEl = document.getElementById(`status-${role}-${name}`);
+  statusEl.textContent = '검증 중...';
+  statusEl.className = 'status';
+
+  const region = document.getElementById('regionInput').value.trim() || 'us-east-1';
+  const res = await fetch('/api/setup/validate-profile', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ profile: name, region })
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    statusEl.textContent = data.account_id;
+    statusEl.className = 'status valid';
+    state.region = region;
+    if (role === 'deploy') {
+      state.deploy_profile = name;
+      state.deploy_account_id = data.account_id;
+      state.deploy_arn = data.arn;
+    } else {
+      state.mgmt_profile = name;
+      state.mgmt_account_id = data.account_id;
+      state.mgmt_arn = data.arn;
+    }
+    checkStep1Ready();
+  } else {
+    statusEl.textContent = '실패';
+    statusEl.className = 'status invalid';
+    if (role === 'mgmt') {
+      document.getElementById('mgmtStatus').innerHTML = '<span style="color:#ef4444;">검증 실패: ' + (data.error||'') + '</span>';
+    }
+  }
+}
+
+async function runDiscovery() {
+  const prefix = document.getElementById('ddbPrefix').value.trim();
+  const info = document.getElementById('accountInfo');
+  info.innerHTML = `
+    <div class="info-card"><div class="label">배포 계정</div><div class="value">${state.deploy_profile} (${state.deploy_account_id})</div></div>
+    <div class="info-card"><div class="label">Management</div><div class="value">${state.mgmt_profile ? state.mgmt_profile + ' (' + state.mgmt_account_id + ')' : '미설정'}</div></div>
+    <div class="info-card"><div class="label">리전</div><div class="value">${state.region}</div></div>
+    <div class="info-card"><div class="label">ARN</div><div class="value" style="font-size:0.75rem">${state.deploy_arn}</div></div>
+  `;
+  document.getElementById('discoveryResults').innerHTML = '<div class="loading">DynamoDB 테이블 검색 중...</div>';
+
+  const discoverBody = {
+    profile: state.deploy_profile,
+    region: state.region,
+    prefix,
+    mgmt_profile: state.mgmt_profile || ''
+  };
+  const res = await fetch('/api/setup/discover', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(discoverBody)
+  });
+  const data = await res.json();
+  state.discovery = data;
+  state.prefix = prefix;
+
+  let html = '<div class="discovery-section"><h3>DynamoDB 테이블 (프리픽스: ' + prefix + ')</h3>';
+  const tables = data.dynamodb_tables || [];
+  if (tables.length) {
+    tables.forEach(t => {
+      html += `<div class="discovery-item" style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" checked data-table="${t}" class="ddb-check">
+        <span>${t}</span>
+      </div>`;
+    });
+    html += '<p style="margin-top:8px; font-size:0.8rem; color:#94a3b8;">사용할 테이블을 선택하세요.</p>';
+  } else {
+    html += '<div class="discovery-item" style="color:#f59e0b;">해당 프리픽스의 테이블이 없습니다. 설정 완료 후 자동 생성됩니다.</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('discoveryResults').innerHTML = html;
+  document.getElementById('btnNext2').disabled = false;
+
+  // Expert CLI 감지
+  detectExpertCli();
+}
+
+async function detectExpertCli() {
+  const container = document.getElementById('expertCliResults');
+  container.innerHTML = '<div class="loading">CLI 감지 중...</div>';
+  try {
+    const res = await fetch('/api/setup/detect-expert', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}' });
+    const data = await res.json();
+    state.expert_providers = data.providers || {};
+
+    const providers = Object.entries(state.expert_providers);
+    if (providers.length === 0) {
+      container.innerHTML = '<div class="discovery-item" style="color:#f59e0b;">AI CLI가 발견되지 않았습니다. claude 또는 kiro-cli를 설치하세요.</div>';
+      return;
+    }
+
+    let html = '';
+    providers.forEach(([name, info]) => {
+      const label = name === 'claude' ? 'Claude Code' : 'Kiro CLI';
+      const color = name === 'claude' ? '#38bdf8' : '#a78bfa';
+      html += `<div class="discovery-item" style="display:flex; align-items:center; gap:10px;">
+        <span style="color:${color}; font-weight:600;">${label}</span>
+        <span style="color:#94a3b8; font-size:0.8rem;">${info.version}</span>
+        <span style="color:#64748b; font-size:0.75rem; margin-left:auto;">${info.path}</span>
+      </div>`;
+    });
+
+    if (providers.length >= 2) {
+      html += '<p style="margin-top:8px; font-size:0.8rem; color:#22c55e;">2개 모두 감지됨 — 채팅 패널에서 전환 가능합니다.</p>';
+    }
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="discovery-item" style="color:#ef4444;">감지 실패: ' + e.message + '</div>';
+  }
+}
+
+function showSummary() {
+  const selectedTables = [...document.querySelectorAll('.ddb-check:checked')].map(el => el.dataset.table);
+  const expertNames = Object.keys(state.expert_providers).map(k => k === 'claude' ? 'Claude Code' : 'Kiro CLI');
+  document.getElementById('summaryTable').innerHTML = `
+    <tr><td>배포 계정</td><td>${state.deploy_profile} (${state.deploy_account_id})</td></tr>
+    <tr><td>Management</td><td>${state.mgmt_profile || '미설정'}</td></tr>
+    <tr><td>리전</td><td>${state.region}</td></tr>
+    <tr><td>DDB 프리픽스</td><td>${state.prefix || 'frontier-agent-hub'}</td></tr>
+    <tr><td>DDB 테이블</td><td>${selectedTables.length ? selectedTables.join(', ') : '자동 생성 예정'}</td></tr>
+    <tr><td>Expert Agent</td><td>${expertNames.length ? expertNames.join(', ') : '미감지'}</td></tr>
+  `;
+}
+
+async function waitForReady() {
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const res = await fetch('/api/setup/profiles', { signal: AbortSignal.timeout(2000) });
+      if (res.ok) return;
+    } catch(e) {}
+  }
+}
+
+async function saveAndStart() {
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
+  btn.textContent = '설정 저장 및 DDB 생성 중...';
+
+  const selectedTables = [...document.querySelectorAll('.ddb-check:checked')].map(el => el.dataset.table);
+  const res = await fetch('/api/setup/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      deploy_profile: state.deploy_profile,
+      deploy_account_id: state.deploy_account_id,
+      mgmt_profile: state.mgmt_profile,
+      mgmt_account_id: state.mgmt_account_id,
+      region: state.region,
+      prefix: state.prefix || 'frontier-agent-hub',
+      tables: selectedTables,
+      expert_providers: state.expert_providers
+    })
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    btn.textContent = '완료!';
+    btn.style.background = '#22c55e';
+    window.location.href = '/';
+  } else {
+    btn.textContent = '오류: ' + (data.message || '저장 실패');
+    btn.disabled = false;
+  }
+}
+
+loadProfiles();
+</script>
+</body>
+</html>

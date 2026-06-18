@@ -1,0 +1,207 @@
+/* Simulation Panel v2 — Round card SSE UI */
+
+#simPanel {
+    padding: 12px;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.sim-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.sim-title {
+    font-size: .72rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.sim-status {
+    font-size: .58rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.sim-status-idle { color: #64748b; background: #1e293b; }
+.sim-status-starting { color: #fbbf24; background: #f59e0b15; }
+.sim-status-running { color: #38bdf8; background: #0ea5e915; animation: sim-pulse 1.5s infinite; }
+.sim-status-success { color: #4ade80; background: #22c55e15; }
+.sim-status-failed { color: #fca5a5; background: #ef444415; }
+.sim-status-error { color: #fca5a5; background: #ef444415; }
+.sim-status-cancelled { color: #94a3b8; background: #47556915; }
+.sim-status-disconnected { color: #f59e0b; background: #f59e0b15; }
+
+@keyframes sim-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .6; }
+}
+
+.sim-cancel-btn {
+    margin-left: auto;
+    font-size: .55rem;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid #ef4444;
+    background: transparent;
+    color: #fca5a5;
+    cursor: pointer;
+}
+.sim-cancel-btn:hover { background: #ef444420; }
+
+/* Round card */
+.sim-round {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+.sim-round-error {
+    border-color: #ef444440;
+}
+
+.sim-round-hdr {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    user-select: none;
+}
+.sim-round-hdr:hover { background: #334155; }
+
+.sim-round-num {
+    font-size: .62rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.sim-phase-badge {
+    font-size: .52rem;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: #0ea5e915;
+    color: #38bdf8;
+    font-weight: 600;
+}
+
+.sim-verdict-badge {
+    font-size: .52rem;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 700;
+}
+.sim-verdict-badge.pass { background: #22c55e20; color: #4ade80; }
+.sim-verdict-badge.fail { background: #ef444420; color: #fca5a5; }
+
+.sim-round-body {
+    padding: 4px 12px 10px;
+    border-top: 1px solid #0f172a;
+}
+.sim-round-body.collapsed { display: none; }
+
+.sim-agent-section {
+    margin-bottom: 8px;
+}
+
+.sim-agent-label {
+    font-size: .56rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.sim-action-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: .58rem;
+    padding: 2px 0;
+    line-height: 1.5;
+}
+
+.sim-icon-ok { color: #4ade80; font-size: .6rem; }
+.sim-icon-fail { color: #fca5a5; font-size: .6rem; }
+
+.sim-tool {
+    color: #38bdf8;
+    font-family: 'SF Mono', monospace;
+    font-size: .54rem;
+    flex-shrink: 0;
+}
+
+.sim-output {
+    color: #94a3b8;
+    font-size: .52rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Verdict section */
+.sim-verdict-section {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: .58rem;
+}
+.sim-verdict-section.pass { background: #22c55e10; border: 1px solid #22c55e30; }
+.sim-verdict-section.fail { background: #ef444410; border: 1px solid #ef444430; }
+
+.sim-verdict-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.sim-verdict-section.pass .sim-verdict-title { color: #4ade80; }
+.sim-verdict-section.fail .sim-verdict-title { color: #fca5a5; }
+
+.sim-verdict-reason {
+    color: #e2e8f0;
+    font-size: .56rem;
+    margin-bottom: 3px;
+}
+
+.sim-verdict-hint {
+    color: #fbbf24;
+    font-size: .52rem;
+    font-style: italic;
+}
+
+/* Error */
+.sim-error-msg {
+    padding: 8px 12px;
+    color: #fca5a5;
+    font-size: .58rem;
+}
+
+/* Completion bar */
+.sim-complete-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: .6rem;
+    font-weight: 600;
+    margin-top: 8px;
+}
+.sim-complete-bar.success { background: #22c55e10; border: 1px solid #22c55e30; color: #4ade80; }
+.sim-complete-bar.fail { background: #ef444410; border: 1px solid #ef444430; color: #fca5a5; }
+
+.sim-action-btn {
+    font-size: .52rem;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid #475569;
+    background: #1e293b;
+    color: #e2e8f0;
+    cursor: pointer;
+}
+.sim-action-btn:hover { background: #334155; border-color: #38bdf8; }

@@ -1,0 +1,58 @@
+{
+  "id": "K10-liveness",
+  "name": "Liveness Probe Failure",
+  "category": "kubernetes",
+  "layer": "Kubernetes → Health Check",
+  "purpose": "Liveness Probe 실패로 인한 Pod 재시작 감지",
+  "flow": [
+    "실패하는 Liveness Probe가 설정된 Deployment 생성",
+    "Liveness Probe 연속 실패",
+    "kubelet이 컨테이너 재시작"
+  ],
+  "expected_root_cause": "Liveness Probe Failure - 헬스체크 엔드포인트 확인",
+  "trigger": {
+    "type": "kubectl",
+    "command": "kubectl apply -f - <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: test-liveness-fail\n  namespace: dockercoins\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: test-liveness-fail\n  template:\n    metadata:\n      labels:\n        app: test-liveness-fail\n    spec:\n      containers:\n      - name: app\n        image: busybox\n        command: [\"sh\", \"-c\", \"sleep 3600\"]\n        livenessProbe:\n          httpGet:\n            path: /healthz\n            port: 8080\n          initialDelaySeconds: 5\n          periodSeconds: 5\n          failureThreshold: 3\nEOF"
+  },
+  "restore": {
+    "command": "kubectl delete deployment test-liveness-fail -n dockercoins --ignore-not-found"
+  },
+  "verification": {
+    "steps": [
+      {
+        "name": "Liveness Probe 실패 확인",
+        "type": "pod_logs",
+        "pod": "test-liveness-fail",
+        "pattern": "Liveness probe failed|Back-off restarting failed container",
+        "timeout": 90,
+        "poll_interval": 10
+      }
+    ]
+  },
+  "evaluation_rubric": {
+    "root_cause_match": {
+      "weight": 30,
+      "criteria": "근본 원인이 Liveness probe 실패임을 정확히 식별했는가"
+    },
+    "data_sources": {
+      "weight": 25,
+      "required": [
+        "K8s",
+        "Logs"
+      ],
+      "criteria": "K8s 이벤트, probe 실패 로그를 활용했는가"
+    },
+    "causal_chain": {
+      "weight": 20,
+      "criteria": "probe 실패 → pod 재시작 → 서비스 불안정 인과관계를 설명했는가"
+    },
+    "false_leads": {
+      "weight": 15,
+      "criteria": "잘못된 방향에 시간을 낭비하지 않았는가"
+    },
+    "code_analysis": {
+      "weight": 10,
+      "criteria": "probe 설정 및 헬스체크 코드를 분석했는가"
+    }
+  }
+}

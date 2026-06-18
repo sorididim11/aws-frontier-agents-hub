@@ -1,0 +1,159 @@
+<mxfile host="claude-code" agent="architecture-skill" version="1.0">
+  <diagram name="IAM Roles — Official Guide vs Ours" id="iam-roles">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="DevOps Agent IAM Roles — 공식 가이드 기준" style="text;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="600" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LEFT: Official Guide ========== -->
+        <mxCell id="left-label" value="공식 가이드 (AWS 권장)" style="text;fontSize=13;fontStyle=5;align=center;fontColor=#1565C0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="50" width="620" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Agent Space -->
+        <mxCell id="agent-space" value="Agent Space" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.machinelearning;sketch=0;fontStyle=1;fontSize=11;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fillColor=#6C3483;fontColor=#6C3483;" vertex="1" parent="1">
+          <mxGeometry x="365" y="85" width="48" height="48" as="geometry"/>
+        </mxCell>
+
+        <!-- Role 1: Agent Space Role -->
+        <mxCell id="role1-box" value="" style="rounded=1;whiteSpace=wrap;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;arcSize=8;dashed=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="170" width="350" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="role1-title" value="Role 1: Agent Space Role" style="text;fontSize=13;fontStyle=1;align=left;fontColor=#2E7D32;html=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="178" width="300" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="role1-trust" value="&lt;b&gt;Trust:&lt;/b&gt; aidevops.amazonaws.com&lt;br&gt;+ aws:SourceAccount&lt;br&gt;+ aws:SourceArn (agentspace/*)" style="rounded=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#A5D6A7;fontSize=10;align=left;spacingLeft=8;html=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="210" width="320" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="role1-managed" value="&lt;b&gt;Managed:&lt;/b&gt; AIDevOpsAgentAccessPolicy&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;819 read-only actions, Resource: *&lt;br&gt;(Agent 조사에 필요 — 수정 금지)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#A5D6A7;fontSize=10;align=left;spacingLeft=8;html=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="275" width="320" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="role1-inline" value="&lt;b&gt;Inline:&lt;/b&gt; iam:CreateServiceLinkedRole&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;Resource Explorer SLR만&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#A5D6A7;fontSize=10;align=left;spacingLeft=8;html=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="340" width="320" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="role1-scope" value="📖 계정 전체 리소스 읽기 (조사용)" style="text;fontSize=10;fontStyle=2;fontColor=#2E7D32;align=center;html=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="395" width="320" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="role1-check-ok" value="✅ 우리 구성: 일치" style="text;fontSize=11;fontStyle=1;fontColor=#2E7D32;align=center;html=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="420" width="320" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Role 2: Operator App Role -->
+        <mxCell id="role2-box" value="" style="rounded=1;whiteSpace=wrap;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;arcSize=8;dashed=0;" vertex="1" parent="1">
+          <mxGeometry x="420" y="170" width="350" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="role2-title" value="Role 2: Operator App Role" style="text;fontSize=13;fontStyle=1;align=left;fontColor=#E65100;html=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="178" width="300" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="role2-trust" value="&lt;b&gt;Trust:&lt;/b&gt; aidevops.amazonaws.com&lt;br&gt;+ sts:AssumeRole &lt;b&gt;+ sts:TagSession&lt;/b&gt;&lt;br&gt;+ aws:SourceAccount + aws:SourceArn" style="rounded=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#FFCC80;fontSize=10;align=left;spacingLeft=8;html=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="210" width="320" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="role2-managed" value="&lt;b&gt;Managed:&lt;/b&gt; AIDevOpsOperatorAppAccessPolicy&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;27 aidevops: actions&lt;br&gt;AgentSpaceId 태그 기반 scoping&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#FFCC80;fontSize=10;align=left;spacingLeft=8;html=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="275" width="320" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="role2-actions" value="&lt;b&gt;주요 액션:&lt;/b&gt; CreateChat, SendMessage,&lt;br&gt;ListChats, ListExecutions, ...&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;+ support:CreateCase, DescribeCases&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#FFCC80;fontSize=10;align=left;spacingLeft=8;html=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="340" width="320" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="role2-scope" value="💬 Agent Space API 호출 (운영자용)" style="text;fontSize=10;fontStyle=2;fontColor=#E65100;align=center;html=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="395" width="320" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="role2-check-missing" value="❌ 우리 구성: 누락 (추가 필요)" style="text;fontSize=11;fontStyle=1;fontColor=#C62828;align=center;html=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="420" width="320" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows from Agent Space to Roles -->
+        <mxCell id="arrow-as-role1" value="sts:AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=1.5;fontSize=9;fontColor=#2E7D32;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="agent-space" target="role1-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow-as-role2" value="sts:AssumeRole&#xa;+ TagSession" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=1.5;fontSize=9;fontColor=#E65100;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="agent-space" target="role2-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== RIGHT: Boundary Check Value ========== -->
+        <mxCell id="right-label" value="Boundary Check의 의미" style="text;fontSize=13;fontStyle=5;align=center;fontColor=#1565C0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="830" y="50" width="720" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Meaningful checks (green) -->
+        <mxCell id="check-meaningful-box" value="" style="rounded=1;whiteSpace=wrap;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="830" y="85" width="350" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-meaningful-title" value="✅ 의미 있는 검사" style="text;fontSize=12;fontStyle=1;fontColor=#2E7D32;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="845" y="92" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-m1" value="1. Managed policy가 AIDevOpsAgentAccessPolicy인지&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;(ReadOnlyAccess면 과도한 권한)&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="118" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-m2" value="2. Trust policy에 SourceAccount + SourceArn&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;(없으면 아무 서비스가 assume 가능)&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="158" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-m3" value="3. Write 권한 없음 확인&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;(Scan, PutItem, DeleteTable 등 차단)&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="198" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-m4" value="4. Operator App Role 존재 확인&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;(없으면 Agent Space API 호출 불가)&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="238" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-m5" value="5. 불필요한 inline policy 없음&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;(SLR 생성 외 추가 inline = 과잉)&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="278" width="320" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- Meaningless checks (red) -->
+        <mxCell id="check-meaningless-box" value="" style="rounded=1;whiteSpace=wrap;fillColor=#FFEBEE;strokeColor=#C62828;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="85" width="350" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-meaningless-title" value="❌ 의미 없는 검사 (현재 우리가 하는 것)" style="text;fontSize=12;fontStyle=1;fontColor=#C62828;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1225" y="92" width="320" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-x1" value="1. Resource: *를 &quot;leak&quot;으로 표시&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;→ 공식 가이드가 이렇게 하라고 함&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="118" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-x2" value="2. 태그 기반 Deny 추가 권고&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;→ Agent 조사 기능을 망가뜨림&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="158" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-x3" value="3. metadata 읽기(DescribeTable)를 위험으로 분류&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;→ 데이터 접근이 아님, 정상 동작&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="198" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="check-x4" value="4. aidevops: 액션을 agent role에 추가&lt;br&gt;&lt;font color=&quot;#888&quot;&gt;→ Operator App Role에 있어야 함&lt;/font&gt;" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="238" width="320" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- Bottom: Action Items -->
+        <mxCell id="action-box" value="" style="rounded=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="830" y="360" width="730" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="action-title" value="🔧 수정 필요 사항" style="text;fontSize=13;fontStyle=1;fontColor=#1565C0;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="845" y="368" width="300" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="action1" value="&lt;b&gt;04-devops-agent.yml:&lt;/b&gt; inline에서 aidevops:* 제거, iam:CreateServiceLinkedRole만 남김" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="395" width="700" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="action2" value="&lt;b&gt;04-devops-agent.yml:&lt;/b&gt; Operator App Role 추가 (AIDevOpsOperatorAppAccessPolicy + sts:TagSession)" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="418" width="700" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="action3" value="&lt;b&gt;permission-check:&lt;/b&gt; boundary 표시를 &quot;leak&quot; → &quot;managed policy 범위 (정상)&quot;으로 변경" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="441" width="700" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="action4" value="&lt;b&gt;permission-check:&lt;/b&gt; Operator App Role 존재 여부 검사 추가" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="464" width="700" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="action5" value="&lt;b&gt;02-eks-platform.yml:&lt;/b&gt; dashboard role inline에서 aidevops:* 제거 (Operator App Role로 이관)" style="text;fontSize=10;align=left;html=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="487" width="700" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-line" value="" style="endArrow=none;strokeColor=#CCCCCC;strokeWidth=1;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="800" y="80" as="sourcePoint"/>
+            <mxPoint x="800" y="550" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

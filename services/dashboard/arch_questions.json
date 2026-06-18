@@ -1,0 +1,489 @@
+{
+  "version": "11.0",
+  "description": "Top-down question pipeline: Q1(apps) → Q2(services per app). No Bedrock — DevOps Agent returns render-ready JSON directly.",
+  "questions": {
+    "Q1": {
+      "display_name": "Q1 앱 식별",
+      "description": "환경의 앱 목록, 앱 간 관계, 워크플로우를 식별",
+      "question_template": "이 환경에서 관리되는 애플리케이션들이 무엇인지 알려주세요.\n\n아래 3단계로 답변해주세요:\n\n## 1단계: 전체 주요 흐름 (Critical Workflows)\n태그와 무관하게, 이 환경의 핵심 E2E 비즈니스 흐름을 설명해주세요. 각 흐름이 어떤 서비스/리소스를 어떤 순서로 통과하는지 구체적으로 나열해주세요.\n\n중요 규칙:\n- 알람, SNS, EventBridge 등 이벤트 기반 서비스는 트리거(누가 발동시키는지)와 목적지(어디로 전달하는지)를 반드시 찾아서 흐름에 포함하세요.\n- 개별 워크플로우를 나열한 후, 각 워크플로우 간에 트리거/이벤트/목적지로 연결되는 부분이 있는지 확인하세요. 연결되는 흐름은 하나의 E2E 체인으로 통합해서 설명하세요.\n\n## 2단계: 태그 기반 흐름 매핑\n같은 주요 흐름을 AWS 리소스의 App 태그 기준으로 다시 설명해주세요. 각 서비스가 어떤 App 태그를 갖고 있는지 명시하세요.\n\n## 3단계: 갭 분석\n1단계와 2단계의 차이를 비교해서:\n- 태그가 없거나 잘못 붙어있어서 흐름에서 빠지는 서비스/리소스\n- 태그 경계 때문에 끊어지는 E2E 흐름\n을 구체적으로 알려주세요.\n\n자연어 설명 후에, arch-discover 스킬의 **Q1 출력 포맷**에 맞는 JSON 블록을 제공해주세요.\n각 앱에 숫자 id를 부여하세요 (1부터 시작). 후속 질문에서 참조용입니다.\n\n참고용 알려진 리소스:\n{tagged_resources_list}",
+      "output_fields": [
+        "system_name",
+        "description",
+        "apps",
+        "app_edges",
+        "app_workflows"
+      ]
+    },
+    "Q2": {
+      "display_name": "Q2 앱별 서비스 상세",
+      "description": "특정 앱의 서비스 목록, 연결 관계, 워크플로우를 graph.nodes/edges 포맷으로 수집",
+      "question_template": "앱 #{app_id} \"{app_name}\"의 내부를 완전히 해부하세요.\n\n## Step 1: 전수조사 — 이 앱의 모든 실행 단위를 빠짐없이 나열하라\n\n\"실행 단위\" = 독립적으로 프로세스/스레드를 갖는 것. 런타임 종류 무관:\n- EKS: 각 Pod의 **모든 컨테이너** (메인 + 사이드카 + init). 같은 Pod라도 역할이 다르면 별도 노드\n- Lambda, Fargate Task, EC2 인스턴스\n- AWS 관리형 서비스 (DynamoDB, SNS, EventBridge, SQS 등)\n- 로컬 프로세스/데몬 (별도 포트로 listen하는 것)\n\n\"같은 앱\" 판단:\n- App 태그 = {app_name}\n- 또는 같은 Pod/Task 내에서 이 앱을 위해 동작하는 컨테이너\n- 또는 이 앱 전용 저장소/큐/이벤트 채널\n\n다른 앱({other_apps})의 내부는 탐색하지 마세요.\n\n## Step 2: 연결 식별 — 각 노드 간 실제 데이터 흐름을 찾아라\n\nEdge = 실제 데이터 이동 1 hop. 다음은 edge가 아님:\n- 모니터링/참조/소유 관계\n- 양방향 edge (A→B가 있으면 B→A 금지)\n\n이미 내부 노드로 존재하는 서비스의 외부 endpoint를 다시 경계 노드로 만들지 말 것.\n\n## Step 3: 워크플로우 대입 — 아래 흐름이 내부에서 어떻게 통과하는지 매핑하라\n\n{app_workflows}\n\n각 흐름의 시작점에 외부 트리거가 있으면 boundary_node, 끝점이 다른 앱으로 이어지면 해당 앱의 boundary_node로 연결.\n\n**중요**: Step 1에서 발견했지만 어떤 워크플로우에도 매핑되지 않는 노드가 있다면, 그 노드를 위한 새 워크플로우를 추가하라 (예: 사이드카 프로세스, 백그라운드 데몬, 관리 API 등).\n\n## Step 4: 자기검증\narch-discover 스킬의 검증 체크리스트를 확인하세요.\n\n## 출력 포맷\narch-discover 스킬의 **Q2 출력 포맷**을 정확히 따르세요. nodes, boundary_nodes, edges, workflows 구조를 포함한 JSON을 제공하세요.",
+      "output_fields": [
+        "app_name",
+        "nodes",
+        "edges",
+        "workflows"
+      ]
+    },
+    "Q2_K8S": {
+      "display_name": "Q2-K8s 리소스 상세",
+      "description": "K8s 기반 앱의 namespace 단위 전체 리소스를 수집 — 워크로드, SA, Secret, ConfigMap, Ingress 포함",
+      "question_template": "앱 \"{app_name}\"이 사용하는 Kubernetes namespace를 모두 확인하고, 각 namespace의 전체 리소스를 상세히 조사해주세요.\n\n## 조사 항목\n\n### 1. Namespace 정보\n- 이 앱과 관련된 모든 namespace 이름\n- 각 namespace의 labels\n- ResourceQuota, LimitRange 설정 여부\n\n### 2. 워크로드 (Deployment, StatefulSet, DaemonSet, CronJob, Job)\n각 워크로드에 대해:\n- 정확한 kind (Deployment/StatefulSet/DaemonSet/CronJob/Job)\n- namespace, replicas\n- 모든 containers: name, image, resource requests/limits, ports, liveness/readiness probes\n- init containers 목록\n- 환경변수 참조: 어떤 ConfigMap, Secret에서 가져오는지\n- 연결된 Service: type (ClusterIP/LoadBalancer/NodePort), ports, loadBalancer hostname\n- HPA 설정: min/max replicas, metrics\n- PDB 설정: minAvailable 또는 maxUnavailable\n- volumes: PVC, ConfigMap, Secret, emptyDir 등\n- annotations (특히 instrumentation, sidecar injection 관련)\n- nodeSelector, tolerations\n\n### 3. ServiceAccount\n- 각 namespace의 ServiceAccount 목록 (default 제외)\n- IRSA annotation (eks.amazonaws.com/role-arn) 값\n- 연결된 Secret 목록\n\n### 4. Secret\n- 각 namespace의 Secret 목록 (default-token, helm 관련 제외)\n- 각 Secret의 type (Opaque, kubernetes.io/tls 등)\n- key 목록만 (값은 제외)\n\n### 5. ConfigMap\n- 각 namespace의 ConfigMap 목록 (kube-root-ca 등 시스템 제외)\n- key 목록\n\n### 6. PersistentVolumeClaim\n- name, namespace, storageClass, capacity, accessMode, 실제 사용 여부\n\n### 7. NetworkPolicy\n- 존재 여부, 규칙 요약\n\n### 8. Ingress\n- name, namespace, rules (hosts, paths, backend), TLS 설정\n\n아래 JSON 형식으로 응답해주세요:\n\n```json\n{\n  \"app_name\": \"{app_name}\",\n  \"namespaces\": [\n    {\n      \"name\": \"namespace-name\",\n      \"labels\": {},\n      \"resource_quota\": null,\n      \"limit_range\": null\n    }\n  ],\n  \"workloads\": [\n    {\n      \"name\": \"이전에 식별된 노드명과 동일\",\n      \"kind\": \"Deployment\",\n      \"namespace\": \"실제 K8s namespace\",\n      \"replicas\": 1,\n      \"containers\": [\n        {\n          \"name\": \"container-name\",\n          \"image\": \"registry/image:tag\",\n          \"resources\": {\"requests\": {\"cpu\": \"50m\", \"memory\": \"64Mi\"}, \"limits\": {\"cpu\": \"200m\", \"memory\": \"128Mi\"}},\n          \"ports\": [80],\n          \"probes\": {\"liveness\": {\"httpGet\": \"/\", \"port\": 80}, \"readiness\": {\"httpGet\": \"/\", \"port\": 80}},\n          \"env_from\": [\"configmap/config-name\", \"secret/secret-name\"]\n        }\n      ],\n      \"init_containers\": [],\n      \"service_account\": \"sa-name\",\n      \"hpa\": null,\n      \"pdb\": null,\n      \"service\": {\"type\": \"ClusterIP\", \"ports\": [{\"port\": 80, \"targetPort\": 80}], \"loadBalancer\": null},\n      \"volumes\": [{\"name\": \"data\", \"type\": \"PVC\", \"claim\": \"data-pvc\"}],\n      \"annotations\": {},\n      \"node_selector\": {},\n      \"tolerations\": []\n    }\n  ],\n  \"service_accounts\": [\n    {\"name\": \"sa-name\", \"namespace\": \"ns\", \"irsa_role_arn\": \"arn:aws:iam::role/...\", \"secrets\": []}\n  ],\n  \"secrets\": [\n    {\"name\": \"secret-name\", \"namespace\": \"ns\", \"type\": \"Opaque\", \"keys\": [\"key1\", \"key2\"]}\n  ],\n  \"configmaps\": [\n    {\"name\": \"cm-name\", \"namespace\": \"ns\", \"keys\": [\"KEY1\", \"KEY2\"]}\n  ],\n  \"persistent_volume_claims\": [\n    {\"name\": \"pvc-name\", \"namespace\": \"ns\", \"storage_class\": \"gp2\", \"capacity\": \"1Gi\", \"access_mode\": \"ReadWriteOnce\", \"status\": \"Bound\"}\n  ],\n  \"network_policies\": [\n    {\"name\": \"policy-name\", \"namespace\": \"ns\", \"description\": \"설명 (한국어)\"}\n  ],\n  \"ingresses\": [\n    {\"name\": \"ing-name\", \"namespace\": \"ns\", \"rules\": [{\"host\": \"...\", \"paths\": [{\"path\": \"/\", \"backend\": \"svc:80\"}]}], \"tls\": false}\n  ]\n}\n```\n\n규칙:\n- workloads[].name은 이전 Q2에서 식별한 노드 이름과 정확히 일치해야 합니다\n- kind는 정확한 K8s 리소스 타입만: Deployment, StatefulSet, DaemonSet, CronJob, Job\n- hpa, pdb는 없으면 null\n- 빈 목록은 빈 배열 []\n- Secret 값은 절대 포함하지 마세요 — key 이름만\n- default ServiceAccount, kube-system의 시스템 리소스는 제외\n- 모든 description은 한국어로 작성하세요",
+      "output_fields": [
+        "app_name",
+        "namespaces",
+        "workloads",
+        "service_accounts",
+        "secrets",
+        "configmaps",
+        "persistent_volume_claims",
+        "network_policies",
+        "ingresses"
+      ]
+    }
+  },
+  "validation_rules": {
+    "Q1": {
+      "required_fields": [
+        "system_name",
+        "description",
+        "apps",
+        "app_edges"
+      ],
+      "app_required": [
+        "id",
+        "name",
+        "description"
+      ],
+      "forbidden_group_names": [
+        "UserManagement",
+        "Observability",
+        "ChaosEngineering",
+        "Monitoring",
+        "Security",
+        "Networking",
+        "Storage",
+        "Compute"
+      ]
+    },
+    "Q2": {
+      "required_fields": [
+        "app_name",
+        "nodes",
+        "edges"
+      ],
+      "node_required": [
+        "name",
+        "namespace",
+        "kind",
+        "service_type",
+        "group",
+        "labels"
+      ],
+      "edge_required": [
+        "source",
+        "target",
+        "description"
+      ],
+      "no_orphan_nodes": true,
+      "no_bidirectional_edges": true
+    }
+  },
+  "agents": {
+    "L1": {
+      "display_name": "L1 서비스 아키텍트",
+      "model_id": "us.anthropic.claude-sonnet-4-6",
+      "max_turns": 3,
+      "quality_threshold": 75,
+      "system_prompt": "당신은 시니어 애플리케이션 아키텍트입니다. DevOps Agent에게 보낸 질문과 받은 답변이 주어집니다. 이 답변을 분석하여 서비스 레벨 아키텍처(L1 — 1km View)를 구조화된 JSON으로 변환하세요.\n\n## 분석 목표\nL1 다이어그램을 그리기 위한 4가지를 추출합니다:\n1. **앱 분류 (taxonomy)**: 어떤 앱이 있고, 각 앱의 목적과 분류 기준\n2. **서비스 목록 (services)**: 각 앱을 구성하는 서비스와 역할\n3. **통신 흐름 (edges)**: 서비스 간 호출 관계 (source → target, 단방향만)\n4. **워크플로우 (workflows)**: 비즈니스 시나리오별 실행 흐름을 순서가 있는 hop 배열로 표현\n\n## 사전 정보\nAWS 리소스 태그 목록이 시스템 프롬프트 하단에 제공될 수 있습니다. 답변과 대조하여 빠진 서비스나 리소스가 없는지 확인하세요.\n\n## 작업 절차\n\n### Step 1 — 답변 파싱 (즉시)\nDevOps Agent 답변에서 taxonomy, services, edges, workflows를 추출하여 submit_analysis를 호출하세요.\nDevOps Agent는 마크다운(테이블, ASCII 다이어그램, 번호 목록)으로 응답합니다.\n- 앱별 서비스 목록에서 taxonomy + services 추출\n- 번호 매긴 흐름 설명에서 edges 추출 (각 step = 1 edge)\n- 순서 있는 흐름에서 workflows 추출 (각 step = 1 hop)\n- 앱 간 관계 설명에서 앱 간 edge 추출\n\n### Step 2 — 검증 후 보완 (필요 시)\n- submit_analysis 호출 후 검증 실패가 반환되면, 오류를 수정하여 다시 submit하세요\n- 사전 정보 대조 시 5개 이상 리소스가 누락된 경우에만 ask_devops_agent로 1회 후속 질문\n- 후속 질문 시 누락된 리소스를 명시적으로 나열하여 한번에 해결\n- 2회 이상 후속 질문 금지 — 부족해도 있는 정보로 submit하세요\n\n### 하지 마세요\n- 특정 플랫폼/기술 가정 (\"namespace X\", \"list deployments\")\n- JSON 형식으로 답변 요청\n- L2 범위의 질문: 실행 환경(EKS/Lambda), 트리거, 포트, 프로토콜 상세는 L2에서 수집. L1은 \"무엇이 있고 어떻게 연결되는가\"까지만\n- 설정 리소스를 서비스로 등록: Parameter Group, Subnet Group, Security Group, IAM Role/Policy 등 다른 서비스의 설정 부속품은 services에 넣지 마세요\n\n## 앱 그룹 분류 — Taxonomy 수립\n\nL1의 핵심 산출물은 **앱 그룹 분류 체계(taxonomy)**입니다. L2가 이를 기준으로 분석합니다.\n\n### \"앱\"의 정의\n앱(app group)은 **독립적으로 배포되고 운영되는 소프트웨어 제품 또는 시스템**입니다.\n- 여러 서비스(마이크로서비스, DB, 캐시, Lambda, 큐 등)로 구성될 수 있습니다\n- 이름은 고유한 제품명/프로젝트명입니다\n- AWS 관리형 서비스만으로 구성된 것도 앱입니다 — 실행 환경이 아닌 비즈니스 목적으로 판단\n- 클라우드 벤더 제공 관리형 앱(예: AWS DevOps Agent)도 앱입니다\n\n### 앱 vs 플랫폼 인프라\n- **앱**: 비즈니스 워크플로우를 수행. 삭제하면 특정 기능이 깨짐\n- **플랫폼 인프라**: 앱 실행 기반. 삭제하면 모든 앱이 영향. 목적에 맞는 이름 부여\n\n### 분류 규칙\n1. **그룹명 = 제품/프로젝트 고유 이름**. 기능 카테고리(UserManagement), 기술 영역(Observability), 방법론(ChaosEngineering) 이름 금지\n2. 앱 전용 데이터 저장소/큐/알람은 해당 앱 그룹에 포함\n3. 앱의 운영 파이프라인(알람→알림→조사)은 그 앱에 포함. 별도 그룹 분리 금지\n4. 모든 서비스에 group 필수\n\n## 서비스 식별 — 3단 분리 (아이콘 매핑용)\n\n각 서비스를 3필드로 분리하세요. service + resource_type → 아이콘 결정, resource_name → 노드 라벨.\n\n| service | resource_type | 예시 name | 예시 resource_name |\n|---|---|---|---|\n| Amazon EKS | Deployment | hasher | hasher |\n| AWS Lambda | Function | lambda-alarm-to-webhook | alarm-to-webhook |\n| Amazon DynamoDB | Table | dynamodb-investigation-events | investigation-events |\n| Amazon CloudWatch | Alarm | cw-alarm-cpu-high | dockercoins-cpu-high |\n| Amazon CloudWatch | Logs | cw-logs-cluster | /aws/eks/cluster |\n| Amazon SNS | Topic | sns-alarms-topic | devops-agent-test-alarms |\n| Amazon RDS | DB Instance | rds-postgresql | devops-agent-test-db |\n| Amazon ECR | Repository | ecr-hasher | hasher |\n\nname은 kebab-case 고유 식별자. 단독으로 고유하면 resource_name만 (예: hasher, redis).\n\n## Edge 방향 규칙 — 단방향 데이터 흐름만\n- edge의 source = 호출/전송하는 쪽, target = 받는 쪽\n- A→B edge가 있으면 B→A edge 금지 (양방향 = 잘못된 분석)\n- CloudWatch Alarm → SNS (알람이 SNS로 알림 전송) ✓ / SNS → CloudWatch Alarm ✗\n- EventBridge → Lambda (이벤트가 Lambda를 트리거) ✓ / Lambda → EventBridge ✗ (Lambda가 이벤트를 발행하면 Lambda → EventBridge ✓)\n- \"모니터링한다\", \"참조한다\", \"소유한다\"는 edge가 아닙니다. 실제 데이터가 이동하는 방향만 edge입니다\n\n## 자체 검증 (submit 전 필수)\n□ 사전 정보의 주요 서비스와 리소스가 services에 포함? (설정 부속품인 Parameter Group, Subnet Group, Security Group, IAM Role/Policy는 제외)\n□ 모든 서비스에 1개 이상 edge?\n□ 모든 서비스에 group 지정?\n□ 모든 서비스에 service, resource_type, resource_name이 채워져 있는가?\n□ 모든 group 이름이 제품/프로젝트 고유 이름? (기능명/기술영역 아님)\n□ taxonomy의 각 그룹에 classification_criteria가 L2/L3 분석자가 새 서비스 분류에 충분?\n□ 양방향 edge(A→B와 B→A 모두 존재)가 없는가? 있다면 잘못된 방향 제거\n\n## 최종 출력\nsubmit_analysis의 analysis 필드에 아래 JSON을 넣으세요:\n{\n  \"system_name\": \"시스템 이름\",\n  \"description\": \"비즈니스 목적 1-2문장 (한국어)\",\n  \"taxonomy\": [\n    {\n      \"group\": \"앱 고유 이름\",\n      \"description\": \"이 앱의 비즈니스 목적 1문장 (한국어)\",\n      \"classification_criteria\": \"이 그룹에 속하는 서비스의 판별 기준 (한국어)\"\n    }\n  ],\n  \"services\": [\n    {\n      \"name\": \"고유 식별자 (kebab-case)\",\n      \"service\": \"AWS 서비스명\",\n      \"resource_type\": \"리소스 타입\",\n      \"resource_name\": \"실제 리소스명\",\n      \"role\": \"역할 설명 (한국어)\",\n      \"service_type\": \"app|cache|db|gateway|queue|worker|observe|ops|platform\",\n      \"group\": \"앱 그룹명\"\n    }\n  ],\n  \"edges\": [\n    {\"source\": \"호출자\", \"target\": \"대상\", \"protocol\": \"http|grpc|tcp\",\n     \"port\": 80, \"paths\": [\"/path\"], \"methods\": [\"GET\"],\n     \"description\": \"비즈니스 목적 한줄 설명 (한국어)\"}\n  ],\n  \"workflows\": [\n    {\n      \"name\": \"워크플로우 제목 (한국어)\",\n      \"hops\": [\n        {\"from\": \"source서비스name\", \"to\": \"target서비스name\"}\n      ]\n    }\n  ]\n}\n\n규칙:\n- workflows[].hops[].from, to = services[].name과 동일한 값\n- 각 hop = 실제 네트워크 호출 또는 이벤트 1건 = edges에 대응\n- hops 배열 순서 = 실행 시간 순서 (시각화에서 스텝 번호로 사용)\n- name = 사람이 읽을 워크플로우 제목 (한국어)\n\n모든 description, role, name 필드는 한국어로 작성하세요.",
+      "question_template": "이 환경에서 관리되는 애플리케이션들은 무엇인가요? 여러 앱이 있나요? 각 앱의 비즈니스 목적과 역할을 설명해주세요. 어떤 기준으로 앱을 분리했나요? 앱 간 관계나 의존성이 있나요?\n\n각 앱에 포함된 모든 서비스와 리소스를 빠짐없이 나열해주세요. 각각에 대해 AWS 서비스명(예: Amazon CloudWatch, AWS Lambda, Amazon DynamoDB)과 리소스 타입(예: Alarm, Function, Table)을 명시하고, 구체적인 역할과 목적을 설명해주세요. 보조 서비스(시크릿 관리, 파라미터 저장소, 인증 등)도 포함해주세요 — 누가 왜 사용하는지.\n\n설명 후에, 아키텍처를 방향 그래프(directed graph) JSON 형식으로도 제공해주세요. 그래프는 데이터 흐름 방향만 표현합니다 (source = 보내는 쪽, target = 받는 쪽). 모니터링이나 소유 관계에 대해 역방향 edge를 만들지 마세요. 예시 형식:\n\n```json\n{\n  \"services\": [\n    {\"name\": \"worker\", \"service\": \"Amazon EKS\", \"resource_type\": \"Deployment\", \"role\": \"설명\", \"group\": \"앱이름\", \"service_type\": \"app\"},\n    {\"name\": \"sns-alarms\", \"service\": \"Amazon SNS\", \"resource_type\": \"Topic\", \"role\": \"설명\", \"group\": \"앱이름\", \"service_type\": \"managed\"}\n  ],\n  \"edges\": [\n    {\"source\": \"cw-alarm\", \"target\": \"sns-alarms\", \"description\": \"알람 발생 시 알림 전송\"}\n  ],\n  \"workflows\": [\n    {\"name\": \"워크플로우 이름\", \"hops\": [{\"from\": \"a\", \"to\": \"b\"}, {\"from\": \"b\", \"to\": \"c\"}]}\n  ]\n}\n```\n\n그래프 규칙:\n- edge의 source = 데이터를 시작/전송하는 서비스, target = 받는 서비스\n- A가 B를 모니터링하는 것은 edge가 아닙니다. 실제 데이터 전송만 edge입니다.\n- cw-alarm이 sns-alarms를 트리거하면, edge는 cw-alarm -> sns-alarms입니다. sns-alarms -> cw-alarm을 추가하지 마세요.\n- 양방향 edge 금지: A->B가 있으면 B->A는 안 됩니다\n- service_type: app (워크로드), cache, db, gateway, queue, worker, observe (모니터링/알람), ops (장애 주입), platform (인프라). managed는 사용 금지\n\n참고용 알려진 리소스:\n{tagged_resources_list}"
+    },
+    "L2": {
+      "display_name": "L2 컴포넌트 아키텍트",
+      "model_id": "us.anthropic.claude-sonnet-4-6",
+      "max_turns": 3,
+      "quality_threshold": 75,
+      "system_prompt": "당신은 시니어 플랫폼 아키텍트입니다. DevOps Agent에게 보낸 질문과 받은 답변이 주어집니다. L1 분석 결과를 참고하여 컴포넌트 레벨 아키텍처(L2 — 100m View)를 구조화된 JSON으로 변환하세요.\n\n## 분석 목표\nL2 다이어그램을 그리기 위한 3가지를 추출합니다:\n1. **실행 환경 (compute)**: 각 서비스가 어디서 실행되고, 어떤 포트/프로토콜을 사용하는가\n2. **관리형 서비스 (managed_services)**: 어떤 AWS 관리형 서비스를 사용하고, 어떤 서비스가 연결되는가\n3. **외부 의존성 (external_deps)**: 환경 경계 외부 리소스 (cross-account, third-party API 등)\n\n**설정 상세(replicas, resource limits, images, health check, ARN)는 묻지 마세요.**\n\n## 사전 정보\n- L1 분석 결과(앱 목록, 서비스, 통신 흐름, taxonomy)가 컨텍스트로 제공됩니다\n- AWS 태그된 리소스 목록이 시스템 프롬프트에 제공될 수 있습니다\n\n## 작업 절차\n\n### Step 1 — 답변 파싱 (즉시)\nDevOps Agent 답변에서 compute, managed_services, external_deps를 추출하여 submit_analysis를 호출하세요.\n- 각 서비스의 실행 플랫폼과 포트에서 compute 추출\n- AWS 관리형 서비스 목록에서 managed_services 추출\n- 외부/cross-account 의존성에서 external_deps 추출\n\n### Step 2 — 검증 후 보완 (필요 시)\n- submit_analysis 호출 후 검증 실패가 반환되면, 오류를 수정하여 다시 submit하세요\n- 사전 정보 대조 시 주요 관리형 서비스가 누락된 경우에만 ask_devops_agent로 1회 후속 질문\n- 2회 이상 후속 질문 금지 — 부족해도 있는 정보로 submit하세요\n\n## 앱 그룹 분류 — L1 taxonomy 준수\n- 모든 compute, managed_services, external_deps에 group을 지정하세요\n- L1 taxonomy의 classification_criteria 기준으로 분류\n- 여러 앱이 공유하는 리소스 → 가장 밀접한 앱 그룹 또는 별도 인프라 그룹\n\n## 서비스 식별 — 3단 분리 (아이콘 매핑용)\n\nservice + resource_type → 아이콘 결정, resource_name → 노드 라벨.\ncompute의 platform = \"service resource_type\" 형태. managed_services의 type도 동일.\n\n| service | resource_type | 예시 |\n|---|---|---|\n| Amazon EKS | Deployment | hasher, worker |\n| AWS Lambda | Function | alarm-to-webhook |\n| Amazon DynamoDB | Table | investigation-events |\n| Amazon CloudWatch | Alarm | cpu-high |\n| Amazon SNS | Topic | alarms-topic |\n| Amazon RDS | DB Instance | postgresql |\n\n## 자체 검증 (submit 전 필수)\n□ 모든 서비스의 실행 환경이 식별되었는가?\n□ 관리형 서비스가 빠짐없이 식별되었는가?\n□ 외부 의존성이 식별되었는가?\n□ 모든 항목에 group이 지정되어 있는가?\n□ 모든 항목에 service, resource_type, resource_name이 채워져 있는가?\n\n## 최종 출력\nsubmit_analysis의 analysis 필드에 아래 JSON을 넣으세요:\n{\n  \"compute\": [\n    {\n      \"name\": \"고유 식별자 (kebab-case)\",\n      \"service\": \"AWS 서비스명 (Amazon EKS, AWS Lambda 등)\",\n      \"resource_type\": \"리소스 타입 (Deployment, Function 등)\",\n      \"resource_name\": \"실제 리소스명\",\n      \"namespace\": \"네임스페이스 (해당 시)\",\n      \"ports\": [80],\n      \"group\": \"앱 그룹명\"\n    }\n  ],\n  \"managed_services\": [\n    {\n      \"name\": \"고유 식별자 (kebab-case)\",\n      \"service\": \"AWS 서비스명 (Amazon DynamoDB, Amazon SNS 등)\",\n      \"resource_type\": \"리소스 타입 (Table, Topic 등)\",\n      \"resource_name\": \"실제 리소스명\",\n      \"used_by\": [\"서비스1\"],\n      \"group\": \"앱 그룹명\",\n      \"description\": \"목적 (한국어)\"\n    }\n  ],\n  \"external_deps\": [\n    {\n      \"source\": \"서비스 name\",\n      \"target\": \"외부 리소스명\",\n      \"service\": \"AWS 서비스명 (Amazon Bedrock 등)\",\n      \"resource_type\": \"리소스 타입 (Model 등)\",\n      \"protocol\": \"https\",\n      \"port\": 443,\n      \"group\": \"앱 그룹명\",\n      \"description\": \"목적 (한국어)\"\n    }\n  ]\n}\n\n모든 description 필드는 한국어로 작성하세요.",
+      "question_template": "{l1_services_summary}\n\n위에 나열된 서비스들의 실행 환경 상세 정보를 알려주세요:\n\n1. 각 서비스는 어디서 실행되나요? (EKS, Lambda, EC2 등) 각 서비스의 포트와 프로토콜을 포함해주세요.\n2. 각 앱은 어떤 AWS 관리형 서비스(RDS, DynamoDB, SNS, S3 등)를 사용하고, 어떤 서비스가 연결되나요?\n3. 이 환경 외부의 리소스가 있나요? (cross-account 리소스, 서드파티 API, 외부 서비스 등)\n\n설정 상세(replicas, resource limits, images, health checks, ARN)는 필요 없습니다.\n\n참고용 알려진 리소스:\n{tagged_resources_list}"
+    },
+    "L3_risk": {
+      "display_name": "L3 위험 분석 (시나리오 추천용)",
+      "model_id": "us.anthropic.claude-sonnet-4-6",
+      "max_turns": 10,
+      "quality_threshold": 75,
+      "_note": "아키텍처 수집이 아닌 시나리오 추천 단계에서 사용. ArchitectureAgentDiscoverer.LAYERS에 포함하지 않음.",
+      "system_prompt": "당신은 시니어 인프라/보안 아키텍트입니다. L1+L2 아키텍처 분석 결과를 기반으로 위험 분석을 수행하세요.\n\n## 분석 목표\n장애 시나리오 추천에 필요한 위험 정보를 도출합니다:\n1. 단일 장애점(SPOF): 아키텍처적으로 단일 경로인 서비스\n2. Blast Radius: 서비스 실패 시 연쇄 영향 범위\n3. Observability Gaps: 모니터링 사각지대\n\n## 최종 출력\n{\n  \"spof\": [{\"service\": \"서비스명\", \"reason\": \"SPOF 이유 (한국어)\", \"dependents\": [\"영향 서비스\"]}],\n  \"blast_radius\": [{\"failed_service\": \"서비스명\", \"affected\": [\"서비스1\"], \"impact\": \"영향 설명 (한국어)\"}],\n  \"observability_gaps\": [{\"service\": \"서비스명\", \"missing\": [\"health_check\", \"metrics\", \"alarm\", \"logging\"]}]\n}"
+    }
+  },
+  "tools": {
+    "ask_devops_agent": {
+      "toolSpec": {
+        "name": "ask_devops_agent",
+        "description": "AWS DevOps Agent에게 질문을 보냅니다. Agent는 AWS 데이터 소스(CloudWatch, X-Ray, 컴퓨팅 서비스 등)에 접근하여 실시간 인프라 및 애플리케이션 정보를 조사하고 답변합니다. 한 번에 하나의 명확한 질문을 하세요. Agent는 마크다운(테이블, ASCII 다이어그램)으로 응답합니다. 이전 질문과 유사한 질문을 반복하면 오류가 발생하므로 항상 새로운 각도로 질문하세요.",
+        "inputSchema": {
+          "json": {
+            "type": "object",
+            "properties": {
+              "question": {
+                "type": "string",
+                "description": "DevOps Agent에게 보낼 질문 (영어로 작성). 구체적이고 명확하게 작성하세요. 이전 질문과 중복되지 않아야 합니다."
+              }
+            },
+            "required": [
+              "question"
+            ]
+          }
+        }
+      }
+    },
+    "submit_analysis": {
+      "toolSpec": {
+        "name": "submit_analysis",
+        "description": "분석이 완료되면 이 도구를 호출하여 최종 분석 결과를 JSON으로 제출하세요. 충분한 정보를 수집한 후에만 호출하세요.",
+        "inputSchema": {
+          "json": {
+            "type": "object",
+            "properties": {
+              "quality_score": {
+                "type": "integer",
+                "description": "자체 평가 점수 (0-100). 수집한 정보의 완성도와 정확도 평가."
+              },
+              "analysis": {
+                "type": "object",
+                "description": "분석 결과 JSON. L1은 taxonomy/services/edges, L2는 compute/managed_services/external_deps를 사용.",
+                "properties": {
+                  "system_name": {
+                    "type": "string",
+                    "description": "시스템 이름"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "비즈니스 목적 (한국어)"
+                  },
+                  "taxonomy": {
+                    "type": "array",
+                    "description": "L1: 앱 그룹 분류",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "group": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "classification_criteria": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "group",
+                        "description",
+                        "classification_criteria"
+                      ]
+                    }
+                  },
+                  "services": {
+                    "type": "array",
+                    "description": "L1: 서비스 목록",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "고유 식별자 (kebab-case)"
+                        },
+                        "service": {
+                          "type": "string",
+                          "description": "AWS 서비스명 (Amazon EKS, AWS Lambda, Amazon DynamoDB 등)"
+                        },
+                        "resource_type": {
+                          "type": "string",
+                          "description": "리소스 타입 (Deployment, Function, Table, Alarm, Topic 등)"
+                        },
+                        "resource_name": {
+                          "type": "string",
+                          "description": "실제 리소스명"
+                        },
+                        "role": {
+                          "type": "string",
+                          "description": "역할 (한국어)"
+                        },
+                        "service_type": {
+                          "type": "string",
+                          "description": "app|cache|db|gateway|queue|worker|managed|platform"
+                        },
+                        "group": {
+                          "type": "string",
+                          "description": "앱 그룹명"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "service",
+                        "resource_type",
+                        "role",
+                        "service_type",
+                        "group"
+                      ]
+                    }
+                  },
+                  "edges": {
+                    "type": "array",
+                    "description": "L1: 서비스 간 통신 흐름",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "protocol": {
+                          "type": "string"
+                        },
+                        "port": {
+                          "type": "integer"
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "methods": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "target",
+                        "description"
+                      ]
+                    }
+                  },
+                  "workflows": {
+                    "type": "array",
+                    "description": "L1: 비즈니스 워크플로우. hops 순서 = 실행 순서",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "워크플로우 제목 (한국어)"
+                        },
+                        "hops": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "from": {
+                                "type": "string",
+                                "description": "services[].name 참조"
+                              },
+                              "to": {
+                                "type": "string",
+                                "description": "services[].name 참조"
+                              }
+                            },
+                            "required": [
+                              "from",
+                              "to"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "hops"
+                      ]
+                    }
+                  },
+                  "compute": {
+                    "type": "array",
+                    "description": "L2: 실행 환경",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "service": {
+                          "type": "string",
+                          "description": "AWS 서비스명"
+                        },
+                        "resource_type": {
+                          "type": "string",
+                          "description": "리소스 타입"
+                        },
+                        "resource_name": {
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "type": "string"
+                        },
+                        "ports": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        },
+                        "group": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "service",
+                        "resource_type",
+                        "group"
+                      ]
+                    }
+                  },
+                  "managed_services": {
+                    "type": "array",
+                    "description": "L2: AWS 관리형 서비스",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "service": {
+                          "type": "string",
+                          "description": "AWS 서비스명"
+                        },
+                        "resource_type": {
+                          "type": "string",
+                          "description": "리소스 타입"
+                        },
+                        "resource_name": {
+                          "type": "string"
+                        },
+                        "used_by": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "group": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "service",
+                        "resource_type",
+                        "group"
+                      ]
+                    }
+                  },
+                  "external_deps": {
+                    "type": "array",
+                    "description": "L2: 외부 의존성",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "service": {
+                          "type": "string"
+                        },
+                        "resource_type": {
+                          "type": "string"
+                        },
+                        "protocol": {
+                          "type": "string"
+                        },
+                        "port": {
+                          "type": "integer"
+                        },
+                        "group": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "target",
+                        "service",
+                        "resource_type",
+                        "group"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "quality_score",
+              "analysis"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "service_analysis": {
+    "component": {
+      "display_name": "컴포넌트 다이어그램 분석",
+      "question_template": "연결된 GitHub repository에서 {service_name} 서비스의 소스코드를 직접 읽어서 분석해줘.\n\n**중요: 코드에 실제로 존재하는 구조만 보고해줘.** 존재하지 않는 클래스, 패턴, 추상화를 만들어내지 마. 코드가 단순하면 단순하게 보고해.\n\nUML 컴포넌트 다이어그램 관점에서 분석해줘:\n1. 서비스 내부의 책임 단위(컴포넌트)를 식별\n2. 컴포넌트 간 의존 관계 (<<use>>, <<delegate>>, <<create>>)\n3. 외부에 제공하는 인터페이스 (provided interface)\n4. 외부에 의존하는 인터페이스 (required interface)\n\n**컴포넌트 식별 기준:**\n- 클래스가 있으면 → 클래스 = 컴포넌트 (클래스명 그대로 사용)\n- 클래스 없이 함수만 있으면 → 관련 함수 그룹 = 1 컴포넌트 (역할 기반 이름, 예: HashHandler)\n- 파일 1개에 함수 2-3개뿐이면 → 서비스 전체가 1 컴포넌트\n- **절대 금지**: 코드에 없는 Facade, Manager, Controller, Orchestrator 등 엔터프라이즈 패턴명을 붙이지 마. 실제 클래스명/함수 그룹명을 써.\n\n결과를 다음 JSON 형식으로 반환해줘:\n\n```json\n{\n  \"service_name\": \"{service_name}\",\n  \"language\": \"언어명\",\n  \"repo_path\": \"repo 내 소스 경로\",\n  \"components\": [\n    {\n      \"name\": \"컴포넌트명 (실제 클래스명 또는 함수 그룹의 역할명)\",\n      \"stereotype\": \"<<component>>\",\n      \"description\": \"이 컴포넌트의 책임 (한국어)\",\n      \"source_service\": \"{service_name}\",\n      \"files\": [\"구현 파일 목록\"],\n      \"provided_interfaces\": [\n        {\"name\": \"인터페이스명\", \"operations\": [\"operation 시그니처\"], \"protocol\": \"HTTP|gRPC|internal\"}\n      ],\n      \"required_interfaces\": [\n        {\"name\": \"인터페이스명\", \"target\": \"의존 대상 (외부 서비스 또는 내부 컴포넌트)\", \"protocol\": \"HTTP|TCP|import\"}\n      ]\n    }\n  ],\n  \"relationships\": [\n    {\"source\": \"컴포넌트A\", \"target\": \"컴포넌트B\", \"type\": \"<<use>>|<<delegate>>|<<create>>\", \"description\": \"관계 설명\"}\n  ],\n  \"provided_interfaces\": [\n    {\"name\": \"서비스 외부 제공 인터페이스명\", \"component\": \"제공하는 컴포넌트\", \"operations\": [\"operation 시그니처\"], \"protocol\": \"HTTP\", \"port\": 8080}\n  ],\n  \"required_interfaces\": [\n    {\"name\": \"서비스가 외부에 요구하는 인터페이스명\", \"component\": \"사용하는 컴포넌트\", \"target_service\": \"대상 서비스명\", \"protocol\": \"HTTP|TCP\"}\n  ]\n}\n```\n\n규칙:\n- **코드에 실제로 존재하는 것만 보고** — 추론이나 추상화로 만들어낸 컴포넌트 금지\n- 단순한 서비스(파일 1-2개, 함수 몇 개)는 컴포넌트 1-2개면 충분. 억지로 쪼개지 마\n- 각 컴포넌트에 source_service 필드 필수 (어느 서비스 소속인지)\n- provided_interfaces: 이 서비스가 외부에 노출하는 API/포트\n- required_interfaces: 이 서비스가 다른 서비스/DB/외부 API에 의존하는 것\n- relationships: 서비스 내부 컴포넌트 간 의존 방향\n- **검증**: 모든 컴포넌트의 files 목록이 실제 repo에 존재하는 파일인지 확인",
+      "output_fields": [
+        "service_name",
+        "language",
+        "components",
+        "relationships",
+        "provided_interfaces",
+        "required_interfaces"
+      ],
+      "validation": {
+        "required_fields": [
+          "service_name",
+          "components"
+        ],
+        "components_required": [
+          "name",
+          "description"
+        ]
+      }
+    },
+    "dynamic": {
+      "display_name": "내부 호출 흐름 분석",
+      "question_template": "연결된 GitHub repository에서 {service_name} 서비스의 소스코드를 읽고, {endpoint} 요청이 처리되는 내부 호출 흐름을 분석해줘.\n\n요청이 들어와서 응답이 나갈 때까지의 함수/메서드 호출 순서를 추적해줘.\n\n결과를 다음 JSON 형식으로 반환해줘:\n\n```json\n{\n  \"service_name\": \"{service_name}\",\n  \"endpoint\": \"{endpoint}\",\n  \"entry_point\": \"진입 함수명\",\n  \"call_flow\": [\n    {\"caller\": \"호출자 함수/모듈\", \"callee\": \"피호출자\", \"type\": \"sync|async|return\", \"description\": \"설명\"}\n  ],\n  \"external_interactions\": [\n    {\"step\": 3, \"target\": \"외부 서비스명\", \"method\": \"HTTP POST\", \"description\": \"설명\"}\n  ]\n}\n```",
+      "output_fields": [
+        "service_name",
+        "endpoint",
+        "entry_point",
+        "call_flow"
+      ],
+      "validation": {
+        "required_fields": [
+          "service_name",
+          "endpoint",
+          "call_flow"
+        ],
+        "call_flow_required": [
+          "caller",
+          "callee",
+          "type"
+        ]
+      }
+    }
+  }
+}

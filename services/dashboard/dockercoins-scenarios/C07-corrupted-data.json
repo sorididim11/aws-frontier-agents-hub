@@ -1,0 +1,225 @@
+{
+    "id": "C07-corrupted-data",
+    "name": "RNG Data Corruption",
+    "category": "multi-service",
+    "layer": "Composite → Data",
+    "purpose": "RNG 데이터 오염이 hasher 검증 실패로 이어지는 연쇄 장애",
+    "architecture": {
+        "components": [
+            {
+                "id": "rng",
+                "label": "RNG",
+                "type": "app",
+                "desc": "난수 생성 서비스"
+            },
+            {
+                "id": "worker",
+                "label": "Worker",
+                "type": "app",
+                "desc": "작업 처리 서비스"
+            },
+            {
+                "id": "hasher",
+                "label": "Hasher",
+                "type": "app",
+                "desc": "해시 계산 서비스"
+            },
+            {
+                "id": "redis",
+                "label": "Redis",
+                "type": "infra",
+                "desc": "캐시/큐"
+            },
+            {
+                "id": "cw",
+                "label": "CloudWatch",
+                "type": "aws",
+                "desc": "모니터링/알람"
+            },
+            {
+                "id": "lambda",
+                "label": "Lambda",
+                "type": "aws",
+                "desc": "웹훅 전달"
+            },
+            {
+                "id": "agent",
+                "label": "DevOps Agent",
+                "type": "agent",
+                "desc": "AI 조사 에이전트"
+            }
+        ],
+        "edges": [
+            {
+                "from": "worker",
+                "to": "rng",
+                "label": "GET /"
+            },
+            {
+                "from": "worker",
+                "to": "hasher",
+                "label": "POST /"
+            },
+            {
+                "from": "worker",
+                "to": "redis",
+                "label": "INCR"
+            },
+            {
+                "from": "hasher",
+                "to": "cw",
+                "label": "400 에러 메트릭"
+            },
+            {
+                "from": "cw",
+                "to": "lambda",
+                "label": "SNS 알람"
+            },
+            {
+                "from": "lambda",
+                "to": "agent",
+                "label": "웹훅"
+            }
+        ],
+        "fault_path": [
+            "rng",
+            "worker",
+            "hasher",
+            "cw",
+            "lambda",
+            "agent"
+        ]
+    },
+    "flow": [
+        "RNG 응답 품질을 degraded로 설정 (factor 0.5)",
+        "hasher에서 잘못된 데이터 검증 실패",
+        "HTTP 400 에러 증가",
+        "CloudWatch 알람 트리거",
+        "Lambda 웹훅 알림 발송"
+    ],
+    "normal_flow": [
+        {
+            "step": "Worker → RNG",
+            "desc": "Worker가 RNG에 32바이트 랜덤 데이터 요청 (GET /32)"
+        },
+        {
+            "step": "RNG → Worker",
+            "desc": "RNG가 /dev/urandom에서 32바이트 반환 (HTTP 200)"
+        },
+        {
+            "step": "Worker → Hasher",
+            "desc": "Worker가 받은 랜덤 데이터를 Hasher에 전달 (POST /)"
+        },
+        {
+            "step": "Hasher → Worker",
+            "desc": "Hasher가 SHA256 해시 계산 후 반환 (HTTP 200)"
+        },
+        {
+            "step": "Worker → Redis",
+            "desc": "Worker가 해시 결과를 Redis에 저장 (INCR)"
+        }
+    ],
+    "fault_flow": [
+        {
+            "step": "🔴 RNG 오염 → Hasher 검증 실패",
+            "desc": "RNG가 빈 데이터 반환 → Worker가 Hasher에 전달 → HTTP 400 'Empty input'"
+        },
+        {
+            "step": "X-Ray 에러 트레이스",
+            "desc": "hasher error=true 트레이스 발생"
+        },
+        {
+            "step": "CloudWatch 알람",
+            "desc": "hasher-errors 알람 트리거 (Error Sum > 5)"
+        },
+        {
+            "step": "DevOps Agent 조사",
+            "desc": "webhook → Agent 조사 시작 → 완료"
+        }
+    ],
+    "investigation_goal": "DevOps Agent가 Hasher의 400 에러를 보고 시작하지만, 근본 원인이 Hasher가 아닌 RNG의 데이터 오염임을 추적해야 함. 표면 증상(Hasher 에러)이 아닌 upstream 원인(RNG 장애 주입)을 찾아내는 것이 핵심.",
+    "expected_root_cause": "Root Cause: RNG 데이터 오염 (NOT hasher 버그)",
+    "trigger": {
+        "type": "kubectl",
+        "command": "kubectl exec -n dockercoins deployment/rng -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/response?quality=degraded&rate=0.5')\""
+    },
+    "pre_cleanup": {
+        "command": "kubectl exec -n dockercoins deployment/rng -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/response?quality=normal')\" && kubectl exec -n dockercoins deployment/hasher -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/cache?mode=normal')\"",
+        "reset_alarms": [
+            "${PROJECT_NAME}-hasher-errors"
+        ],
+        "wait_ok_timeout": 120
+    },
+    "restore": {
+        "command": "kubectl exec -n dockercoins deployment/rng -- python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/config/response?quality=normal')\""
+    },
+    "verification": {
+        "steps": [
+            {
+                "name": "RNG 오염 → Hasher 검증 실패",
+                "type": "pod_logs",
+                "pod": "hasher",
+                "pattern": "400|Empty input|Validation failed",
+                "timeout": 60,
+                "poll_interval": 10
+            },
+            {
+                "name": "X-Ray 에러 트레이스",
+                "type": "xray_trace",
+                "filter": "service(\"hasher\") AND (error = true OR fault = true)",
+                "minutes": 10,
+                "timeout": 180,
+                "poll_interval": 15
+            },
+            {
+                "name": "CloudWatch 알람",
+                "type": "cw_alarm",
+                "alarm": "${PROJECT_NAME}-hasher-errors",
+                "expected": "ALARM",
+                "timeout": 300,
+                "poll_interval": 15
+            },
+            {
+                "name": "DevOps Agent 조사 시작",
+                "type": "investigation_event",
+                "expected_status": "IN_PROGRESS",
+                "timeout": 600,
+                "poll_interval": 15
+            },
+            {
+                "name": "DevOps Agent 조사 완료",
+                "type": "investigation_event",
+                "expected_status": "COMPLETED",
+                "timeout": 1200,
+                "poll_interval": 30
+            }
+        ]
+    },
+    "evaluation_rubric": {
+        "root_cause_match": {
+            "weight": 30,
+            "criteria": "근본 원인이 RNG 서비스의 데이터 품질 저하(빈 데이터 반환)임을 식별했는가. Hasher가 아닌 upstream RNG가 원인."
+        },
+        "upstream_tracing": {
+            "weight": 25,
+            "criteria": "표면 증상(Hasher 400 에러)에서 upstream 원인(RNG)까지 추적했는가"
+        },
+        "data_sources": {
+            "weight": 20,
+            "required": [
+                "Traces",
+                "Logs",
+                "K8s"
+            ],
+            "criteria": "X-Ray 트레이스로 서비스 간 호출 추적, 로그 분석, K8s 상태를 활용했는가"
+        },
+        "causal_chain": {
+            "weight": 15,
+            "criteria": "RNG 빈 데이터 → Worker 전달 → Hasher 검증 실패 → 400 에러 인과관계를 설명했는가"
+        },
+        "false_leads": {
+            "weight": 10,
+            "criteria": "Hasher 자체 버그로 잘못 결론짓지 않았는가"
+        }
+    }
+}

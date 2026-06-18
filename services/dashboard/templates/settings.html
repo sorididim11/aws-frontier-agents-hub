@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>설정 — AWS Agent Space</title>
+<link rel="icon" type="image/svg+xml" href="/static/icons/aws/aws-cloud.svg">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#e2e8f0;height:100vh;display:flex;flex-direction:column}
+
+.header{padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1e293b;flex-shrink:0}
+.header h1{font-size:.85rem;color:#38bdf8;font-weight:600;white-space:nowrap}
+.header .bc{font-size:.68rem;color:#64748b}
+.header .bc a{color:#94a3b8;text-decoration:none}
+.header .bc a:hover{color:#38bdf8;text-decoration:underline}
+
+.tab-bar{display:flex;gap:0;border-bottom:2px solid #1e293b;padding:0 16px;flex-shrink:0}
+.tab-btn{padding:8px 20px;font-size:.72rem;font-weight:600;color:#64748b;background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;margin-bottom:-2px}
+.tab-btn:hover{color:#94a3b8}
+.tab-btn.active{color:#38bdf8;border-bottom-color:#38bdf8}
+.tab-content{display:none;flex:1;overflow-y:auto;padding:0}
+.tab-content.active{display:block}
+
+.sec-section{padding:20px 24px;border-bottom:1px solid #1e293b}
+.sec-section h3{font-size:.74rem;color:#94a3b8;font-weight:600;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+.sec-section p.empty{font-size:.68rem;color:#475569;padding:12px 0}
+
+.sec-table{width:100%;border-collapse:collapse;font-size:.65rem}
+.sec-table th{text-align:left;padding:7px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #334155;white-space:nowrap}
+.sec-table td{padding:8px 10px;border-bottom:1px solid #1e293b;color:#cbd5e1}
+.sec-table tr:hover td{background:#1e293b}
+.sec-table .mono{font-family:'SF Mono',monospace;font-size:.58rem;color:#94a3b8}
+
+.sev-badge{padding:2px 7px;border-radius:8px;font-size:.54rem;font-weight:600;text-transform:uppercase;display:inline-block}
+.sev-badge.critical{background:#ef444420;color:#fca5a5;border:1px solid #ef444440}
+.sev-badge.high{background:#f9731620;color:#fb923c;border:1px solid #f9731640}
+.sev-badge.medium{background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b40}
+.sev-badge.low{background:#22c55e20;color:#4ade80;border:1px solid #22c55e40}
+.sev-badge.info{background:#38bdf820;color:#7dd3fc;border:1px solid #38bdf840}
+
+.status-badge{padding:2px 7px;border-radius:8px;font-size:.54rem;font-weight:600;display:inline-block}
+.status-badge.open{background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b40}
+.status-badge.fixed{background:#22c55e20;color:#4ade80;border:1px solid #22c55e40}
+.status-badge.remediated{background:#22c55e20;color:#4ade80;border:1px solid #22c55e40}
+
+.pentest-box{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px 18px;margin-bottom:14px}
+.pentest-box .row{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.pentest-box .lb{font-size:.62rem;color:#64748b;min-width:80px}
+.pentest-box .vl{font-size:.68rem;color:#e2e8f0}
+
+.btn-primary{padding:6px 16px;font-size:.66rem;font-weight:600;background:#0ea5e9;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background .2s}
+.btn-primary:hover{background:#0284c7}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:3px 8px;font-size:.56rem}
+
+.remediate-btn{font-size:.56rem;padding:3px 8px;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);border-radius:4px;cursor:pointer}
+.remediate-btn:hover{background:rgba(56,189,248,.22)}
+
+.pentest-status{padding:10px 14px;border-radius:8px;margin:12px 0;font-size:.66rem;display:none}
+.pentest-status.running{display:block;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);color:#7dd3fc}
+.pentest-status.completed{display:block;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#4ade80}
+.pentest-status.failed{display:block;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#fca5a5}
+
+.loading{display:inline-block;width:12px;height:12px;border:2px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.pr-link{color:#38bdf8;text-decoration:none;font-size:.56rem}
+.pr-link:hover{text-decoration:underline}
+
+.gen-section{padding:20px 24px}
+.gen-section h3{font-size:.74rem;color:#94a3b8;font-weight:600;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+.gen-row{display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #1e293b}
+.gen-row .lb{font-size:.62rem;color:#64748b;min-width:120px}
+.gen-row .vl{font-size:.68rem;color:#e2e8f0;font-family:'SF Mono',monospace}
+
+.task-timeline{border:1px solid #1e293b;border-radius:8px;padding:10px 12px;background:#0f172a}
+.task-row{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #1e293b0a}
+.task-row:last-child{border-bottom:none}
+.task-label{font-size:.54rem;color:#cbd5e1;min-width:180px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-bar-container{flex:1;height:6px;background:#1e293b;border-radius:3px;position:relative;overflow:hidden}
+.task-bar{position:absolute;top:0;height:100%;border-radius:3px;transition:width .3s}
+.task-duration{font-size:.5rem;color:#64748b;min-width:32px;text-align:right;font-family:'SF Mono',monospace}
+.task-row:hover{background:#1e293b}
+.task-detail{padding:8px 12px 10px 22px;background:#1e293b;border-radius:0 0 6px 6px;margin:-1px 0 4px;border:1px solid #334155;border-top:none}
+.td-row{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid #0f172a}
+.td-row:last-child{border-bottom:none}
+.td-lb{font-size:.54rem;color:#64748b;min-width:80px;flex-shrink:0}
+.td-vl{font-size:.56rem;color:#cbd5e1;word-break:break-word}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>설정</h1>
+    <span class="bc"><a href="/">Agent Space</a> / 설정</span>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" data-tab="security" onclick="switchSettingsTab('security')">Security (보안)</button>
+    <button class="tab-btn" data-tab="general" onclick="switchSettingsTab('general')">General (일반)</button>
+</div>
+
+<!-- Security Tab -->
+<div class="tab-content active" id="tab-security">
+
+    <!-- 설정 정보 -->
+    <div class="sec-section">
+        <h3>설정 (Configuration)</h3>
+        <div id="sastFindings"><span class="loading"></span> 로딩 중...</div>
+        <div id="targetDomainStatus" style="margin-top:14px"><span class="loading"></span></div>
+    </div>
+
+    <!-- 최근 조사 결과 카드 -->
+    <div class="sec-section">
+        <h3>최근 조사 결과</h3>
+        <div id="latestJobCard"><span class="loading"></span> 로딩 중...</div>
+    </div>
+
+    <!-- 조사 실행 + 이력 -->
+    <div class="sec-section">
+        <h3>조사 (Pentest)</h3>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn-primary" id="btnRunPentest" onclick="runPentest()">조사 시작 (Run Pentest)</button>
+            <a id="secInsightsLink" href="/security/insights" style="font-size:.66rem;font-weight:600;color:#38bdf8;text-decoration:none">조사 결과 및 분석 보기 →</a>
+        </div>
+        <div class="pentest-status" id="pentestStatus"></div>
+        <div id="pentestHistory"><span class="loading"></span> 이력 로딩 중...</div>
+    </div>
+
+</div>
+
+<!-- General Tab -->
+<div class="tab-content" id="tab-general">
+    <div class="gen-section">
+        <h3>인프라 설정 (Infrastructure)</h3>
+        <div id="infraConfig"><span class="loading"></span> 로딩 중...</div>
+        <!-- 설정 모드 (미설정 시 표시) -->
+        <div id="infraSetupMode" style="display:none;">
+          <div style="background:#0f172a;border-radius:8px;padding:16px;margin:12px 0;border-left:3px solid #f59e0b;">
+            <p style="font-size:.72rem;color:#fbbf24;margin-bottom:8px;font-weight:600;">초기 설정이 필요합니다</p>
+            <p style="font-size:.66rem;color:#94a3b8;">AWS 프로필을 선택하고 DynamoDB 테이블을 생성하세요.</p>
+          </div>
+          <div style="margin:12px 0;">
+            <label style="font-size:.62rem;color:#64748b;display:block;margin-bottom:4px;">리전</label>
+            <input type="text" class="input-field" id="setupRegion" value="us-east-1" style="width:200px;font-size:.68rem;padding:6px 10px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:4px;">
+          </div>
+          <div style="margin:12px 0;">
+            <label style="font-size:.62rem;color:#64748b;display:block;margin-bottom:4px;">배포 계정 프로필</label>
+            <select id="setupProfile" style="width:200px;font-size:.68rem;padding:6px 10px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:4px;">
+              <option value="">로딩 중...</option>
+            </select>
+            <span id="setupProfileStatus" style="font-size:.6rem;margin-left:8px;"></span>
+          </div>
+          <div style="margin:12px 0;">
+            <label style="font-size:.62rem;color:#64748b;display:block;margin-bottom:4px;">테이블 프리픽스</label>
+            <input type="text" class="input-field" id="setupPrefix" value="frontier-agent-hub" style="width:240px;font-size:.68rem;padding:6px 10px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:4px;">
+          </div>
+          <button class="btn-primary" id="btnSetupSave" onclick="runSetupSave()" disabled style="margin-top:12px;">설정 저장 & DDB 생성</button>
+          <span id="setupSaveStatus" style="font-size:.6rem;margin-left:10px;color:#94a3b8;"></span>
+        </div>
+        <!-- 수정 버튼 (설정 완료 상태에서) -->
+        <div id="infraEditBtn" style="display:none;margin-top:10px;">
+          <button class="btn-primary btn-sm" onclick="showInfraSetup()">설정 변경</button>
+        </div>
+    </div>
+    <div class="gen-section">
+        <h3>App Info (앱 정보)</h3>
+        <div class="gen-row"><span class="lb">버전</span><span class="vl">1.0.0</span></div>
+        <div class="gen-row"><span class="lb">Agent Space ID</span><span class="vl" id="genSpaceId">-</span></div>
+        <div class="gen-row"><span class="lb">Pentest ID</span><span class="vl" id="genPentestId">-</span></div>
+        <div class="gen-row"><span class="lb">Integration ID</span><span class="vl" id="genIntegrationId">-</span></div>
+    </div>
+    <div class="gen-section">
+        <h3>Private Domain (프라이빗 도메인)</h3>
+        <div id="domainConfig"><span class="loading"></span> 로딩 중...</div>
+    </div>
+</div>
+
+<script src="/static/js/settings_security.js?v={{ cache_bust }}"></script>
+<script>
+var _sid = new URLSearchParams(location.search).get("space_id") || "";
+var SEC_SPACE_ID = "{{ sec_space_id }}";
+var _sil = document.getElementById("secInsightsLink");
+if (_sil) _sil.href = "/security/insights?sec_space_id=" + SEC_SPACE_ID;
+settingsSecurityInit();
+
+// --- Infrastructure Config ---
+(async function loadInfraConfig() {
+  const el = document.getElementById('infraConfig');
+  const setupMode = document.getElementById('infraSetupMode');
+  const editBtn = document.getElementById('infraEditBtn');
+  try {
+    const res = await fetch('/api/settings/infra');
+    const d = await res.json();
+    if (!d.ok) { el.textContent = '로드 실패: ' + (d.error||''); return; }
+    const c = d.config;
+    const configured = !!(c.profile && c.runs_table);
+    if (!configured) {
+      el.innerHTML = '';
+      setupMode.style.display = 'block';
+      loadSetupProfiles();
+      return;
+    }
+    let html = '';
+    html += `<div class="gen-row"><span class="lb">AWS 프로필</span><span class="vl">${c.profile||'-'}</span></div>`;
+    html += `<div class="gen-row"><span class="lb">리전</span><span class="vl">${c.region||'-'}</span></div>`;
+    html += `<div class="gen-row"><span class="lb">Account ID</span><span class="vl">${c.account_id||'-'}</span></div>`;
+    html += `<div class="gen-row"><span class="lb">Mgmt 프로필</span><span class="vl">${c.mgmt_profile||'미설정'}</span></div>`;
+    html += `<div class="gen-row"><span class="lb">DDB Runs</span><span class="vl">${c.runs_table||'-'}</span></div>`;
+    html += `<div class="gen-row"><span class="lb">DDB Events</span><span class="vl">${c.events_table||'-'}</span></div>`;
+    html += `<div class="gen-row"><span class="lb">DDB Findings</span><span class="vl">${c.findings_table||'-'}</span></div>`;
+    if (c.expert_providers && Object.keys(c.expert_providers).length) {
+      const names = Object.entries(c.expert_providers).map(([k,v]) => v.version || k).join(', ');
+      html += `<div class="gen-row"><span class="lb">Expert CLI</span><span class="vl">${names}</span></div>`;
+    }
+    if (c.clusters && Object.keys(c.clusters).length) {
+      html += `<div class="gen-row"><span class="lb">EKS 클러스터</span><span class="vl">${Object.keys(c.clusters).join(', ')}</span></div>`;
+    }
+    el.innerHTML = html;
+    editBtn.style.display = 'block';
+  } catch(e) { el.textContent = '오류: ' + e.message; }
+})();
+
+function showInfraSetup() {
+  document.getElementById('infraSetupMode').style.display = 'block';
+  document.getElementById('infraEditBtn').style.display = 'none';
+  loadSetupProfiles();
+}
+
+async function loadSetupProfiles() {
+  const sel = document.getElementById('setupProfile');
+  try {
+    const res = await fetch('/api/setup/profiles');
+    const d = await res.json();
+    sel.innerHTML = '<option value="">선택...</option>' + d.profiles.map(p => `<option value="${p}">${p}</option>`).join('');
+    sel.onchange = () => validateSetupProfile();
+  } catch(e) { sel.innerHTML = '<option value="">프로필 로드 실패</option>'; }
+}
+
+async function validateSetupProfile() {
+  const profile = document.getElementById('setupProfile').value;
+  const region = document.getElementById('setupRegion').value.trim() || 'us-east-1';
+  const status = document.getElementById('setupProfileStatus');
+  const btn = document.getElementById('btnSetupSave');
+  if (!profile) { btn.disabled = true; status.textContent = ''; return; }
+  status.textContent = '검증 중...';
+  status.style.color = '#94a3b8';
+  try {
+    const res = await fetch('/api/setup/validate-profile', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({profile, region})
+    });
+    const d = await res.json();
+    if (d.ok) {
+      status.textContent = d.account_id;
+      status.style.color = '#22c55e';
+      btn.disabled = false;
+    } else {
+      status.textContent = '실패: ' + (d.error||'').slice(0,40);
+      status.style.color = '#ef4444';
+      btn.disabled = true;
+    }
+  } catch(e) { status.textContent = '오류'; status.style.color='#ef4444'; btn.disabled=true; }
+}
+
+async function runSetupSave() {
+  const btn = document.getElementById('btnSetupSave');
+  const status = document.getElementById('setupSaveStatus');
+  btn.disabled = true;
+  status.textContent = 'DDB 테이블 생성 중...';
+  const body = {
+    deploy_profile: document.getElementById('setupProfile').value,
+    region: document.getElementById('setupRegion').value.trim() || 'us-east-1',
+    prefix: document.getElementById('setupPrefix').value.trim() || 'frontier-agent-hub',
+    tables: [],
+    expert_providers: {}
+  };
+  try {
+    const res = await fetch('/api/setup/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await res.json();
+    if (d.ok) {
+      status.textContent = '완료! 새로고침 중...';
+      status.style.color = '#22c55e';
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      status.textContent = '실패: ' + (d.message||'');
+      status.style.color = '#ef4444';
+      btn.disabled = false;
+    }
+  } catch(e) { status.textContent='오류: '+e.message; status.style.color='#ef4444'; btn.disabled=false; }
+}
+</script>
+</body>
+</html>
